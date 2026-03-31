@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package tianjing.alarm.v1;
+
+option java_package = "com.tianzhu.tianjing.proto.alarm";
+option java_outer_classname = "AlarmProto";
+option java_multiple_files = true;
+
+// 告警服务 gRPC 接口
+service AlarmService {
+  // 提交推理结果告警判定
+  rpc JudgeAlarm(JudgeAlarmRequest) returns (JudgeAlarmResponse);
+  // 查询告警历史
+  rpc QueryAlarms(QueryAlarmRequest) returns (QueryAlarmResponse);
+}
+
+message JudgeAlarmRequest {
+  string scene_id        = 1;
+  string frame_id        = 2;
+  string plugin_id       = 3;
+  bool   is_sandbox      = 4; // SECURITY: 必须传递，用于 SandboxInterceptor 校验
+  float  confidence      = 5;
+  string anomaly_type    = 6;
+  int64  timestamp_ms    = 7;
+  int32  consecutive_frames = 8; // 连续触发帧数
+}
+
+message JudgeAlarmResponse {
+  bool   alarm_triggered = 1;
+  string alarm_level     = 2; // CRITICAL | WARNING | INFO | SANDBOX_*
+  string alarm_id        = 3;
+  string message         = 4;
+}
+
+message QueryAlarmRequest {
+  string scene_id    = 1;
+  string alarm_level = 2;
+  int64  start_ms    = 3;
+  int64  end_ms      = 4;
+  int32  page        = 5;
+  int32  size        = 6;
+}
+
+message QueryAlarmResponse {
+  int64  total   = 1;
+  repeated AlarmRecord items = 2;
+}
+
+message AlarmRecord {
+  string alarm_id    = 1;
+  string scene_id    = 2;
+  string alarm_level = 3;
+  float  confidence  = 4;
+  bool   is_sandbox  = 5;
+  int64  created_at  = 6;
+}

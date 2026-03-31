@@ -1,0 +1,23 @@
+server:
+  port: 8100
+
+spring:
+  application:
+    name: result-aggregate-service
+  kafka:
+    bootstrap-servers: ${TIANJING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: result-aggregate-service-prod-cg
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
+tianjing:
+  jwt:
+    public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}

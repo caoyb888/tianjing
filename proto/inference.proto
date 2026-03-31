@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package tianjing.inference.v1;
+
+option java_package = "com.tianzhu.tianjing.proto.inference";
+option java_outer_classname = "InferenceProto";
+option java_multiple_files = true;
+
+// 同步推理服务（规范：CLAUDE.md §9.2）
+service InferenceService {
+  // 同步推理（仅用于低延迟场景，如飞剪 <10ms 要求）
+  rpc InferSync(InferRequest) returns (InferResponse);
+  // 异步推理状态查询
+  rpc GetInferStatus(InferStatusRequest) returns (InferStatusResponse);
+}
+
+message InferRequest {
+  string scene_id   = 1;
+  string frame_id   = 2;
+  bytes  image      = 3;
+  bool   is_sandbox = 4; // 必须传递，不得默认为 false（规范：CLAUDE.md §11.1）
+  string plugin_id  = 5;
+  ROI    roi        = 6;
+  float  conf_threshold = 7;
+}
+
+message ROI {
+  int32 x = 1;
+  int32 y = 2;
+  int32 w = 3;
+  int32 h = 4;
+}
+
+message InferResponse {
+  string plugin_id         = 1;
+  string version           = 2;
+  string scene_id          = 3;
+  string frame_id          = 4;
+  repeated Detection detections = 5;
+  float  inference_time_ms = 6; // 必填（规范：CLAUDE.md §5.2）
+  int64  timestamp_ms      = 7;
+  string backend           = 8;
+  bool   is_sandbox        = 9;
+}
+
+message Detection {
+  int32  class_id    = 1;
+  string class_name  = 2;
+  float  confidence  = 3;
+  BoundingBox bbox   = 4;
+}
+
+message BoundingBox {
+  float x1 = 1;
+  float y1 = 2;
+  float x2 = 3;
+  float y2 = 4;
+}
+
+message InferStatusRequest {
+  string task_id = 1;
+}
+
+message InferStatusResponse {
+  string task_id = 1;
+  string status  = 2; // PENDING | RUNNING | DONE | FAILED
+  InferResponse result = 3;
+}

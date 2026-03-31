@@ -1,0 +1,39 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: history-replay-service
+  datasource:
+    url: ${TIANJING_POSTGRES_PROD_URL:jdbc:postgresql://localhost:5432/tianjing_prod}
+    username: ${TIANJING_POSTGRES_PROD_USER:tianjing_app}
+    password: ${TIANJING_POSTGRES_PROD_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${TIANJING_REDIS_HOST:localhost}
+      port: ${TIANJING_REDIS_PORT:6379}
+      password: ${TIANJING_REDIS_PASSWORD:}
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+tianjing:
+  jwt:
+    public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
+  minio:
+    endpoint: ${TIANJING_MINIO_ENDPOINT:http://localhost:9000}
+    sim-bucket: tianjing-sim-temp
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

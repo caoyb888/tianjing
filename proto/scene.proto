@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package tianjing.scene.v1;
+
+option java_package = "com.tianzhu.tianjing.proto.scene";
+option java_outer_classname = "SceneProto";
+option java_multiple_files = true;
+
+// 场景配置服务 gRPC 接口（内部服务间调用）
+service SceneConfigService {
+  // 获取场景路由配置（route-dispatch-service 调用）
+  rpc GetActiveScene(GetActiveSceneRequest) returns (GetActiveSceneResponse);
+  // 批量获取所有激活场景
+  rpc ListActiveScenes(ListActiveScenesRequest) returns (ListActiveScenesResponse);
+}
+
+message GetActiveSceneRequest {
+  string scene_id = 1;
+}
+
+message GetActiveSceneResponse {
+  bool   found             = 1;
+  string scene_id          = 2;
+  string plugin_id         = 3;
+  string bound_device_code = 4;
+  int32  frame_interval_ms = 5;
+  ROI    roi               = 6;
+}
+
+message ROI {
+  int32 x = 1;
+  int32 y = 2;
+  int32 w = 3;
+  int32 h = 4;
+}
+
+message ListActiveScenesRequest {
+  string factory = 1; // 可选过滤
+}
+
+message ListActiveScenesResponse {
+  repeated GetActiveSceneResponse scenes = 1;
+}

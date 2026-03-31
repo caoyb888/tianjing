@@ -1,0 +1,41 @@
+server:
+  port: 8093
+
+spring:
+  application:
+    name: route-dispatch-service
+  data:
+    redis:
+      host: ${TIANJING_REDIS_HOST:redis}
+      port: ${TIANJING_REDIS_PORT:6379}
+      password: ${TIANJING_REDIS_PASSWORD:}
+      lettuce:
+        pool:
+          max-active: 8
+  kafka:
+    bootstrap-servers: ${TIANJING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: route-dispatch-service-prod-cg
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-records: 50
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: 1
+      retries: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+tianjing:
+  jwt:
+    public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}

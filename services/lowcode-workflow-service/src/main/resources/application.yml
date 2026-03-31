@@ -1,0 +1,35 @@
+server:
+  port: 8094
+
+spring:
+  application:
+    name: lowcode-workflow-service
+  datasource:
+    url: ${TIANJING_POSTGRES_PROD_URL:jdbc:postgresql://postgres:5432/tianjing_prod}
+    username: ${TIANJING_POSTGRES_USERNAME:tianjing}
+    password: ${TIANJING_POSTGRES_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${TIANJING_REDIS_HOST:redis}
+      port: ${TIANJING_REDIS_PORT:6379}
+      password: ${TIANJING_REDIS_PASSWORD:}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+
+tianjing:
+  jwt:
+    public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}

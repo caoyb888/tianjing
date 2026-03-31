@@ -1,0 +1,58 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${TIANJING_POSTGRES_PROD_URL:jdbc:postgresql://localhost:5432/tianjing_prod}
+    username: ${TIANJING_POSTGRES_PROD_USER:tianjing_app}
+    password: ${TIANJING_POSTGRES_PROD_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+  data:
+    redis:
+      host: ${TIANJING_REDIS_HOST:localhost}
+      port: ${TIANJING_REDIS_PORT:6379}
+      password: ${TIANJING_REDIS_PASSWORD:}
+      database: 0
+      timeout: 3000ms
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# JWT 密钥从 K8s Secret 注入（生产），开发模式留空触发警告
+tianjing:
+  jwt:
+    private-key-pem: ${TIANJING_JWT_PRIVATE_KEY_PEM:}
+    public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
+    access-token-expire-seconds: 28800   # 8 小时
+    refresh-token-expire-seconds: 604800 # 7 天
+  security:
+    # RTSP URL 加密密钥（Base64 编码 AES-256 密钥，32 字节）
+    aes-key: ${TIANJING_AES_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.tianzhu.tianjing: DEBUG
+    org.springframework.security: WARN

@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package tianjing.health.v1;
+
+option java_package = "com.tianzhu.tianjing.proto.health";
+option java_outer_classname = "HealthProto";
+option java_multiple_files = true;
+
+// 感知健康监测服务 gRPC 接口
+service HealthMonitorService {
+  // 上报摄像头健康状态（health-monitor-service 内部调用）
+  rpc ReportCameraHealth(CameraHealthReport) returns (ReportResponse);
+  // 查询场景健康评分
+  rpc GetSceneHealthScore(GetSceneHealthRequest) returns (GetSceneHealthResponse);
+}
+
+message CameraHealthReport {
+  string scene_id      = 1;
+  string camera_id     = 2;
+  float  health_score  = 3; // 0-100，规范：CLAUDE.md §14.2 tianjing_camera_health_score
+  string status        = 4; // ONLINE | OFFLINE | DEGRADED | BLURRY | OVEREXPOSED
+  int64  timestamp_ms  = 5;
+  string detail        = 6; // 诊断详情
+}
+
+message ReportResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+message GetSceneHealthRequest {
+  string scene_id = 1;
+}
+
+message GetSceneHealthResponse {
+  string scene_id     = 1;
+  string camera_id    = 2;
+  float  health_score = 3;
+  string status       = 4;
+  int64  last_updated = 5;
+}
