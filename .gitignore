@@ -1,0 +1,49 @@
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 日志
+*.log
+logs/
+
+# 环境变量（禁止提交密钥）
+.env
+.env.*
+!.env.example
+
+# 依赖目录
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 构建产物
+dist/
+build/
+target/
+*.class
+*.jar
+!*-sources.jar
+
+# 模型文件（通过 MinIO/Harbor 管理，不提交到 Git）
+*.pt
+*.pth
+*.onnx
+*.trt
+*.engine
+
+# 测试覆盖率
+coverage/
+.coverage
+htmlcov/
+
+# 临时文件
+*.tmp
+*.bak
