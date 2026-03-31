@@ -1,0 +1,134 @@
+<template>
+  <div class="model-detail" v-loading="loading">
+    <PageHeader
+      :title="`模型版本 ${versionId}`"
+      description="模型版本详情、审核状态与四眼原则校验"
+    >
+      <template #actions>
+        <el-button @click="$router.back()">返回</el-button>
+        <el-button
+          v-if="model?.status === 'pending_review' && canReview"
+          type="success"
+          @click="approve(true)"
+        >
+          审批通过
+        </el-button>
+        <el-button
+          v-if="model?.status === 'pending_review' && canReview"
+          type="danger"
+          @click="approve(false)"
+        >
+          审批拒绝
+        </el-button>
+        <el-button
+          v-if="model?.status === 'approved' && canReview"
+          type="primary"
+          @click="promoteToProduction"
+        >
+          发布至生产
+        </el-button>
+      </template>
+    </PageHeader>
+
+    <el-row :gutter="16" v-if="model">
+      <el-col :md="12">
+        <el-card shadow="never">
+          <template #header><span class="card-title">版本信息</span></template>
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="版本ID">{{ model.versionId }}</el-descriptions-item>
+            <el-descriptions-item label="插件ID">{{ model.pluginId }}</el-descriptions-item>
+            <el-descriptions-item label="版本号">{{ model.version }}</el-descriptions-item>
+            <el-descriptions-item label="当前状态">
+              <el-tag :type="MODEL_STATUS_CONFIG[model.status as ModelStatus]?.type">
+                {{ MODEL_STATUS_CONFIG[model.status as ModelStatus]?.label }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="提交人">{{ model.submittedBy }}</el-descriptions-item>
+            <el-descriptions-item label="审核人">{{ model.reviewedBy || '待审核' }}</el-descriptions-item>
+            <el-descriptions-item label="提交时间">{{ formatDateTime(model.createdAt) }}</el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+      </el-col>
+      <el-col :md="12">
+        <el-card shadow="never">
+          <template #header><span class="card-title">四眼原则</span></template>
+          <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+            模型审核须由与提交人不同的 MODEL_REVIEWER 完成（四眼原则）。
+            审核人与提交人相同时，系统返回错误码 4004。
+          </el-alert>
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="Sandbox 会话">
+              <el-button
+                v-if="model.sandboxSessionId"
+                link
+                @click="$router.push(`/sandbox/sessions/${model.sandboxSessionId}/report`)"
+              >
+                查看 Sandbox 报告
+              </el-button>
+              <span v-else class="text-secondary">未关联</span>
+            </el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import PageHeader from '@/components/common/PageHeader.vue'
+import { modelApi } from '@/api/model'
+import { MODEL_STATUS_CONFIG } from '@/constants'
+import { UserRole, ModelStatus, type ModelVersion } from '@/types'
+import { formatDateTime } from '@/utils/format'
+import { useAuthStore } from '@/stores/auth'
+
+const route = useRoute()
+const versionId = route.params.versionId as string
+const authStore = useAuthStore()
+const model = ref<ModelVersion | null>(null)
+const loading = ref(false)
+const canReview = computed(() => authStore.hasRole([UserRole.ADMIN, UserRole.MODEL_REVIEWER]))
+
+async function loadModel() {
+  loading.value = true
+  try {
+    const res = await modelApi.get(versionId)
+    model.value = res.data.data
+  } finally {
+    loading.value = false
+  }
+}
+
+async function approve(approved: boolean) {
+  const label = approved ? '通过' : '拒绝'
+  const { value: comment } = await ElMessageBox.prompt(
+    `请输入${label}说明（可选）`,
+    `确认${label}`,
+    { inputPlaceholder: '可选', confirmButtonText: '确定', cancelButtonText: '取消' }
+  ).catch(() => ({ value: null }))
+  if (comment === null) return
+  await modelApi.approve(versionId, { approved, comment })
+  ElMessage.success(`审批已${label}`)
+  loadModel()
+}
+
+async function promoteToProduction() {
+  await ElMessageBox.confirm(
+    '确定将此模型发布至生产环境吗？发布前请确认已通过 Sandbox 验证。',
+    '确认发布',
+    { type: 'warning' }
+  )
+  await modelApi.promote(versionId)
+  ElMessage.success('发布成功')
+  loadModel()
+}
+
+onMounted(loadModel)
+</script>
+<style scoped lang="scss">
+.card-title { font-weight: 600; }
+.text-secondary { color: #909399; font-size: 13px; }
+</style>

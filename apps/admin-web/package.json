@@ -1,0 +1,40 @@
+{
+  "name": "tianjing-admin-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.ts,.tsx --fix"
+  },
+  "dependencies": {
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0",
+    "pinia": "^2.1.7",
+    "element-plus": "^2.6.3",
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.6.8",
+    "echarts": "^5.5.0",
+    "vue-echarts": "^6.7.3",
+    "@vue-flow/core": "^1.26.0",
+    "@vue-flow/background": "^1.3.0",
+    "@vue-flow/controls": "^1.1.1",
+    "@vue-flow/minimap": "^1.4.0",
+    "dayjs": "^1.11.10",
+    "nprogress": "^0.2.0",
+    "pinia-plugin-persistedstate": "^3.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.25",
+    "@types/nprogress": "^0.2.3",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "typescript": "^5.4.2",
+    "vite": "^5.1.6",
+    "vue-tsc": "^2.0.6",
+    "unplugin-auto-import": "^0.17.5",
+    "unplugin-vue-components": "^0.26.0",
+    "sass": "^1.72.0"
+  }
+}
