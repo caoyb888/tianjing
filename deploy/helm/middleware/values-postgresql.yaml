@@ -1,0 +1,118 @@
+# ============================================================
+# PostgreSQL 16.x Helm Values
+# Chart: bitnami/postgresql
+# Namespace: middleware
+# Sprint: S0-02
+# ============================================================
+
+global:
+  postgresql:
+    auth:
+      postgresPassword: ""
+      existingSecret: tianjing-pg-secret
+      secretKeys:
+        adminPasswordKey: postgres-password
+
+image:
+  tag: "16.3.0"
+
+primary:
+  persistence:
+    enabled: true
+    size: 200Gi
+    storageClass: "standard"
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+
+  # 数据库初始化（创建三个业务库）
+  initdb:
+    scripts:
+      01_create_databases.sql: |
+        -- 创建生产库
+        CREATE DATABASE tianjing_prod
+            ENCODING 'UTF8'
+            LC_COLLATE 'zh_CN.UTF-8'
+            LC_CTYPE 'zh_CN.UTF-8'
+            TEMPLATE template0;
+
+        -- 创建 Sandbox 库
+        CREATE DATABASE tianjing_sandbox
+            ENCODING 'UTF8'
+            LC_COLLATE 'zh_CN.UTF-8'
+            LC_CTYPE 'zh_CN.UTF-8'
+            TEMPLATE template0;
+
+        -- 创建训练库（仅训练环境服务可访问，通过 K8s NetworkPolicy 隔离）
+        CREATE DATABASE tianjing_train
+            ENCODING 'UTF8'
+            LC_COLLATE 'zh_CN.UTF-8'
+            LC_CTYPE 'zh_CN.UTF-8'
+            TEMPLATE template0;
+
+        -- Nacos 配置库
+        CREATE DATABASE nacos_config
+            ENCODING 'UTF8'
+            LC_COLLATE 'en_US.UTF-8'
+            LC_CTYPE 'en_US.UTF-8'
+            TEMPLATE template0;
+
+      02_create_users.sql: |
+        -- 生产库用户（仅生产服务使用）
+        CREATE USER tianjing_prod_user WITH ENCRYPTED PASSWORD 'PLACEHOLDER';
+        GRANT ALL PRIVILEGES ON DATABASE tianjing_prod TO tianjing_prod_user;
+
+        -- Sandbox 库用户（仅 sandbox-infer-service 使用）
+        CREATE USER tianjing_sandbox_user WITH ENCRYPTED PASSWORD 'PLACEHOLDER';
+        GRANT ALL PRIVILEGES ON DATABASE tianjing_sandbox TO tianjing_sandbox_user;
+
+        -- 训练库用户（仅训练环境服务使用）
+        CREATE USER tianjing_train_user WITH ENCRYPTED PASSWORD 'PLACEHOLDER';
+        GRANT ALL PRIVILEGES ON DATABASE tianjing_train TO tianjing_train_user;
+
+        -- Nacos 用户
+        CREATE USER nacos WITH ENCRYPTED PASSWORD 'PLACEHOLDER';
+        GRANT ALL PRIVILEGES ON DATABASE nacos_config TO nacos;
+
+  # PostgreSQL 调优参数
+  extendedConfiguration: |
+    max_connections = 500
+    shared_buffers = 2GB
+    effective_cache_size = 6GB
+    maintenance_work_mem = 512MB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    work_mem = 8MB
+    log_min_duration_statement = 1000
+    log_checkpoints = on
+    log_connections = on
+    log_lock_waits = on
+
+# 只读副本（供看板服务读取）
+readReplicas:
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 200Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# 指标
+metrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi

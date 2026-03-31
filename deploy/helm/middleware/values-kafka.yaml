@@ -1,0 +1,61 @@
+# ============================================================
+# Apache Kafka 3.6.x Helm Values
+# Chart: bitnami/kafka
+# Namespace: middleware
+# Sprint: S0-02
+# ============================================================
+replicaCount: 3
+
+# KRaft 模式（无 ZooKeeper，Kafka 3.3+ 推荐）
+kraft:
+  enabled: true
+
+listeners:
+  client:
+    protocol: PLAINTEXT
+  controller:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT
+
+# 持久化存储
+persistence:
+  enabled: true
+  size: 100Gi
+  storageClass: "standard"
+
+# 资源配额
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 4Gi
+
+# JVM 调优
+heapOpts: "-Xmx2g -Xms1g"
+
+# 日志保留策略
+extraConfig: |
+  log.retention.hours=168
+  log.retention.bytes=107374182400
+  log.segment.bytes=1073741824
+  auto.create.topics.enable=false
+  num.partitions=4
+  default.replication.factor=2
+  min.insync.replicas=2
+  compression.type=lz4
+
+# 服务暴露（ClusterIP，仅内部访问）
+service:
+  type: ClusterIP
+  ports:
+    client: 9092
+
+# 指标（Prometheus）
+metrics:
+  kafka:
+    enabled: true
+  jmx:
+    enabled: true

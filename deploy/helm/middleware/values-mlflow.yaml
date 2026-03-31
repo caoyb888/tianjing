@@ -1,0 +1,86 @@
+# ============================================================
+# MLflow 2.11.x 部署配置
+# Namespace: training（训练命名空间）
+# Sprint: S0-04
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tianjing-mlflow
+  namespace: training
+  labels:
+    app: mlflow
+    project: tianjing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsNonRoot: true
+      containers:
+        - name: mlflow
+          image: harbor.tianjing.internal/tianjing-base/mlflow:2.11.3
+          args:
+            - mlflow
+            - server
+            - --host=0.0.0.0
+            - --port=5000
+            - --backend-store-uri=postgresql://$(MLFLOW_DB_USER):$(MLFLOW_DB_PASS)@$(PG_HOST):5432/tianjing_train
+            - --default-artifact-root=s3://tianjing-models-staging/mlflow/
+            - --serve-artifacts
+            - --artifacts-destination=s3://tianjing-models-staging/mlflow/
+          env:
+            - name: MLFLOW_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-train-db-secret
+                  key: username
+            - name: MLFLOW_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-train-db-secret
+                  key: password
+            - name: PG_HOST
+              value: tianjing-postgresql.middleware.svc.cluster.local
+            # MinIO S3 兼容配置
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: http://tianjing-minio.middleware.svc.cluster.local:9000
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-minio-secret
+                  key: minio-root-user
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-minio-secret
+                  key: minio-root-password
+          ports:
+            - containerPort: 5000
+              name: http
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 5

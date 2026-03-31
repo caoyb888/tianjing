@@ -1,0 +1,214 @@
+# ============================================================
+# Label Studio 私有化部署（训练命名空间）
+# Sprint：S0-05
+# 说明：数据标注工具，仅部署于 training 命名空间
+#       DA-1、DA-2 通过内网访问，不对外暴露
+# ============================================================
+
+---
+# PVC：标注数据持久化
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tianjing-label-studio-pvc
+  namespace: training
+  labels:
+    app: label-studio
+    project: tianjing
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+# Secret：Label Studio 管理员初始化配置
+# SECURITY: 实际密码通过外部 Secret 管理工具（如 Vault/Sealed Secrets）注入
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tianjing-label-studio-secret
+  namespace: training
+  labels:
+    app: label-studio
+    project: tianjing
+type: Opaque
+stringData:
+  # 占位，部署前通过 CI/CD 注入真实值
+  LABEL_STUDIO_USERNAME: "admin@tianjing.internal"
+  LABEL_STUDIO_PASSWORD: "PLACEHOLDER_REPLACE_BEFORE_DEPLOY"
+  DJANGO_DB_USER: "tianjing_train_user"
+  DJANGO_DB_PASS: "PLACEHOLDER_REPLACE_BEFORE_DEPLOY"
+
+---
+# ConfigMap：Label Studio 环境配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tianjing-label-studio-config
+  namespace: training
+  labels:
+    app: label-studio
+    project: tianjing
+data:
+  DJANGO_DB: "default"
+  POSTGRESQLHOST: "tianjing-postgresql.middleware.svc.cluster.local"
+  POSTGRESQLPORT: "5432"
+  POSTGRESQLDBNAME: "tianjing_train"
+  # MinIO S3 兼容存储（标注图像存储）
+  STORAGE_TYPE: "s3"
+  S3_ENDPOINT: "http://tianjing-minio.middleware.svc.cluster.local:9000"
+  S3_BUCKET: "tianjing-datasets"
+  S3_REGION: "us-east-1"
+  # 禁用外部网络访问
+  LABEL_STUDIO_DISABLE_SIGNUP_WITHOUT_LINK: "true"
+  # 允许最大上传文件大小（录像文件可能较大）
+  LABEL_STUDIO_MAX_UPLOAD_SIZE: "5368709120"
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tianjing-label-studio
+  namespace: training
+  labels:
+    app: label-studio
+    project: tianjing
+    version: "1.14.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: label-studio
+  strategy:
+    type: Recreate  # 单副本，Recreate 避免 PVC 冲突
+  template:
+    metadata:
+      labels:
+        app: label-studio
+        project: tianjing
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+      containers:
+        - name: label-studio
+          image: heartexlabs/label-studio:1.14.0
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: tianjing-label-studio-config
+          env:
+            - name: LABEL_STUDIO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-label-studio-secret
+                  key: LABEL_STUDIO_USERNAME
+            - name: LABEL_STUDIO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-label-studio-secret
+                  key: LABEL_STUDIO_PASSWORD
+            - name: DJANGO_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-label-studio-secret
+                  key: DJANGO_DB_USER
+            - name: DJANGO_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-label-studio-secret
+                  key: DJANGO_DB_PASS
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-minio-secret
+                  key: minio-root-user
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tianjing-minio-secret
+                  key: minio-root-password
+          volumeMounts:
+            - name: data
+              mountPath: /label-studio/data
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: tianjing-label-studio-pvc
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: tianjing-label-studio
+  namespace: training
+  labels:
+    app: label-studio
+    project: tianjing
+spec:
+  type: ClusterIP
+  selector:
+    app: label-studio
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+
+---
+# Ingress（仅内网访问）
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tianjing-label-studio-ingress
+  namespace: training
+  labels:
+    app: label-studio
+    project: tianjing
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "5120m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: label-studio.tianjing.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: tianjing-label-studio
+                port:
+                  name: http

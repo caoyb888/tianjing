@@ -1,0 +1,119 @@
+# ============================================================
+# Sandbox 命名空间网络隔离策略
+# Sprint：S0-01
+# 规范：CLAUDE.md §10.1（P0 安全红线）
+# 说明：Sandbox 服务只能接收来自 production 命名空间
+#       traffic-mirror-service 的流量，禁止访问生产服务
+#       和工业互联网平台 MQTT Broker
+# ============================================================
+
+---
+# Sandbox 推理服务隔离策略
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sandbox-infer-isolation
+  namespace: sandbox
+  labels:
+    project: tianjing
+    security: critical
+spec:
+  podSelector:
+    matchLabels:
+      app: sandbox-infer-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 只允许来自 production 命名空间 traffic-mirror-service 的入流量
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: production
+          podSelector:
+            matchLabels:
+              app: traffic-mirror-service
+      ports:
+        - protocol: TCP
+          port: 8080
+    # 允许 monitoring 命名空间的 Prometheus 抓取指标
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # 允许访问 middleware 命名空间（Kafka/Redis/PostgreSQL/MinIO）
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: middleware
+    # 允许 DNS 解析
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 允许访问云端推理 API（实验室阶段，HTTPS 出口）
+    # TODO Sprint 5 GPU 到位后删除此规则
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Sandbox 命名空间默认拒绝策略（白名单模式）
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sandbox-default-deny
+  namespace: sandbox
+  labels:
+    project: tianjing
+spec:
+  podSelector: {}  # 应用于命名空间内所有 Pod
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# training 命名空间默认拒绝策略（禁止访问生产网络）
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: training-default-deny-prod
+  namespace: training
+  labels:
+    project: tianjing
+    security: critical
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # 允许访问 training 命名空间内部
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: training
+    # 允许访问 middleware 命名空间（训练数据库 / MinIO）
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: middleware
+    # 允许 DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # 禁止：严禁访问 production 命名空间（此处不添加任何 production 出口规则）

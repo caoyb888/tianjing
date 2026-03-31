@@ -1,0 +1,86 @@
+# ============================================================
+# Harbor 2.10.x Helm Values
+# Chart: harbor/harbor
+# Namespace: middleware
+# Sprint: S0-04
+# ============================================================
+
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    certSource: secret
+    secret:
+      secretName: tianjing-harbor-tls
+  ingress:
+    hosts:
+      core: harbor.tianjing.internal
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
+
+externalURL: https://harbor.tianjing.internal
+
+# Harbor 各组件配置
+portal:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+
+core:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+
+jobservice:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+  jobLoggers:
+    - file
+  loggerSweeperDuration: 14
+
+registry:
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+
+trivy:
+  enabled: true
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+# 持久化存储
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  persistentVolumeClaim:
+    registry:
+      size: 500Gi
+      storageClass: "standard"
+    database:
+      size: 10Gi
+      storageClass: "standard"
+    redis:
+      size: 1Gi
+      storageClass: "standard"
+
+# 认证
+harborAdminPassword: ""  # 通过 Secret 注入
+
+# 数据库（使用内置 PostgreSQL 或外部）
+database:
+  type: internal
+
+# 初始项目（通过 post-install Hook 创建）
+# 项目列表：
+#   tianjing-base   - 基础镜像
+#   tianjing-prod   - 生产推理服务镜像
+#   tianjing-train  - 训练服务镜像（仅训练环境可 pull）

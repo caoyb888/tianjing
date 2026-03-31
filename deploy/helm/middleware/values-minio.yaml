@@ -1,0 +1,110 @@
+# ============================================================
+# MinIO Helm Values
+# Chart: bitnami/minio
+# Namespace: middleware
+# Sprint: S0-02
+# ============================================================
+
+mode: distributed
+replicaCount: 4
+
+auth:
+  rootUser: minioadmin
+  existingSecret: tianjing-minio-secret
+  rootUserSecretKey: minio-root-user
+  rootPasswordSecretKey: minio-root-password
+
+persistence:
+  enabled: true
+  size: 500Gi
+  storageClass: "standard"
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 2
+    memory: 4Gi
+
+service:
+  type: ClusterIP
+  ports:
+    api: 9000
+    console: 9001
+
+# 初始化 Bucket（通过 post-install job 创建）
+provisioning:
+  enabled: true
+  buckets:
+    - name: tianjing-frames-prod
+      region: us-east-1
+      versioning: false
+      withLock: false
+      lifecycle:
+        - id: frames-prod-lifecycle
+          prefix: ""
+          disabled: false
+          expiry:
+            days: 180
+    - name: tianjing-frames-sandbox
+      region: us-east-1
+      versioning: false
+      lifecycle:
+        - id: frames-sandbox-lifecycle
+          expiry:
+            days: 3
+    - name: tianjing-models-prod
+      region: us-east-1
+      versioning: true
+    - name: tianjing-models-staging
+      region: us-east-1
+      versioning: true
+    - name: tianjing-datasets
+      region: us-east-1
+      versioning: true
+    - name: tianjing-exports
+      region: us-east-1
+      versioning: false
+      lifecycle:
+        - id: exports-lifecycle
+          expiry:
+            days: 90
+    # 实验室录像（S0-07 录像导入目标 bucket）
+    - name: tianjing-lab-video
+      region: us-east-1
+      versioning: false
+    # 离线仿真临时上传（72小时自动清理）
+    - name: tianjing-sim-temp
+      region: us-east-1
+      versioning: false
+      lifecycle:
+        - id: sim-temp-lifecycle
+          expiry:
+            days: 3
+
+  # Bucket 访问策略（对应 CLAUDE.md §7.3）
+  policies:
+    - name: frames-prod-read-only
+      statements:
+        - resources:
+            - "arn:aws:s3:::tianjing-frames-prod"
+            - "arn:aws:s3:::tianjing-frames-prod/*"
+          actions:
+            - "s3:GetBucketLocation"
+            - "s3:GetObject"
+            - "s3:ListBucket"
+    - name: models-prod-read-only
+      statements:
+        - resources:
+            - "arn:aws:s3:::tianjing-models-prod"
+            - "arn:aws:s3:::tianjing-models-prod/*"
+          actions:
+            - "s3:GetBucketLocation"
+            - "s3:GetObject"
+            - "s3:ListBucket"
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true

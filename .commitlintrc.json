@@ -1,0 +1,42 @@
+{
+  "extends": ["@commitlint/config-conventional"],
+  "rules": {
+    "type-enum": [
+      2,
+      "always",
+      ["feat", "fix", "refactor", "perf", "test", "docs", "chore", "ci", "revert"]
+    ],
+    "scope-enum": [
+      1,
+      "always",
+      [
+        "scene-config",
+        "auth",
+        "alarm",
+        "alarm-judge",
+        "route",
+        "sandbox",
+        "drift",
+        "health",
+        "training",
+        "device",
+        "calibration",
+        "lowcode",
+        "replay",
+        "dashboard",
+        "sysadmin",
+        "frontend",
+        "algo",
+        "deploy",
+        "k8s",
+        "db",
+        "proto",
+        "ci",
+        "docs"
+      ]
+    ],
+    "subject-max-length": [2, "always", 100],
+    "subject-empty": [2, "never"],
+    "body-max-line-length": [1, "always", 200]
+  }
+}

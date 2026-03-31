@@ -1,0 +1,62 @@
+# ============================================================
+# 天柱·天镜 · 工业视觉 AI 推理平台
+# K8s 命名空间定义（Sprint 0 · S0-01）
+# 说明：五大命名空间严格隔离，禁止跨命名空间直接访问
+# ============================================================
+---
+# 生产命名空间：生产推理服务、告警服务、管理后台服务
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    name: production
+    env: prod
+    project: tianjing
+    # Istio mTLS 自动注入
+    istio-injection: enabled
+
+---
+# Sandbox 命名空间：实验室推理服务（无告警权限）
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sandbox
+  labels:
+    name: sandbox
+    env: sandbox
+    project: tianjing
+    istio-injection: enabled
+
+---
+# 训练命名空间：训练服务（与生产网络物理隔离，禁止访问生产数据）
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: training
+  labels:
+    name: training
+    env: train
+    project: tianjing
+    # 训练命名空间不注入 Istio（训练任务不走服务网格）
+    istio-injection: disabled
+
+---
+# 监控命名空间：Prometheus / Grafana / Jaeger
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    project: tianjing
+
+---
+# 中间件命名空间：Kafka / Nacos / Redis / PostgreSQL / TDengine / MinIO
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: middleware
+  labels:
+    name: middleware
+    project: tianjing

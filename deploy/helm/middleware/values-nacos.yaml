@@ -1,0 +1,68 @@
+# ============================================================
+# Nacos 2.3.x Helm Values
+# Namespace: middleware
+# Sprint: S0-02
+# ============================================================
+
+global:
+  mode: cluster
+
+nacos:
+  replicaCount: 3
+
+  image:
+    repository: nacos/nacos-server
+    tag: "v2.3.2"
+    pullPolicy: IfNotPresent
+
+  # 存储配置（PostgreSQL 作为配置持久化后端）
+  storage:
+    type: mysql
+    db:
+      host: tianjing-postgresql
+      port: 5432
+      name: nacos_config
+      username: nacos
+      # 密码通过 Secret 注入
+      existingSecret: tianjing-nacos-db-secret
+      passwordKey: nacos-db-password
+
+  env:
+    - name: MODE
+      value: cluster
+    - name: PREFER_HOST_MODE
+      value: hostname
+    - name: JVM_XMS
+      value: 512m
+    - name: JVM_XMX
+      value: 512m
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 768Mi
+    limits:
+      cpu: 1
+      memory: 1536Mi
+
+  persistence:
+    enabled: true
+    storageClass: "standard"
+    size: 10Gi
+
+  service:
+    type: ClusterIP
+    port: 8848
+    grpcPort: 9848
+
+  # 初始化命名空间（通过 init 脚本创建，对应服务命名空间）
+  initNamespaces:
+    - id: "tianjing-prod"
+      name: "天镜-生产"
+      desc: "生产环境配置命名空间"
+    - id: "tianjing-sandbox"
+      name: "天镜-Sandbox"
+      desc: "实验室环境配置命名空间"
+    - id: "tianjing-train"
+      name: "天镜-训练"
+      desc: "训练环境配置命名空间"

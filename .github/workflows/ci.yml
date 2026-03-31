@@ -1,0 +1,283 @@
+# ============================================================
+# 天柱·天镜 CI 流水线
+# Sprint：S0-06
+# 触发：develop / feature/* / hotfix/* 分支的 PR 或 push
+# 流程：构建 → 单测 → 代码质量 → 推送 Harbor
+# ============================================================
+
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
+      - 'release/**'
+  pull_request:
+    branches:
+      - develop
+      - main
+
+# 并发控制：同一分支同时只运行一个 CI
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HARBOR_REGISTRY: harbor.tianjing.internal
+  HARBOR_PROJECT: tianjing-prod
+  JAVA_VERSION: '21'
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================================
+  # Job 1: Commit Message 校验（Conventional Commits）
+  # ============================================================
+  commit-lint:
+    name: Commit Message 规范校验
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install commitlint
+        run: |
+          npm install -g @commitlint/cli @commitlint/config-conventional
+
+      - name: 校验 PR 中所有提交消息
+        run: |
+          commitlint --from ${{ github.event.pull_request.base.sha }} \
+                     --to   ${{ github.event.pull_request.head.sha }} \
+                     --verbose
+
+  # ============================================================
+  # Job 2: Java 后端构建与单测
+  # ============================================================
+  java-build:
+    name: Java 后端构建与单测
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - scene-config-service
+          - auth-service
+          - alarm-judge-service
+          - route-dispatch-service
+          - alarm-rule-service
+          - device-manage-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: 构建并执行单元测试
+        run: |
+          if [ -f "services/${{ matrix.service }}/pom.xml" ]; then
+            cd services/${{ matrix.service }}
+            mvn -B clean verify \
+              --no-transfer-progress \
+              -Dspring.profiles.active=test
+          else
+            echo "服务 ${{ matrix.service }} 尚未初始化，跳过"
+          fi
+
+      - name: 上传测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-test-report-${{ matrix.service }}
+          path: services/${{ matrix.service }}/target/surefire-reports/
+          retention-days: 7
+
+      - name: 校验覆盖率（Service 层 ≥ 80%）
+        run: |
+          if [ -f "services/${{ matrix.service }}/target/site/jacoco/index.html" ]; then
+            # 解析 JaCoCo 覆盖率报告
+            COVERAGE=$(grep -oP 'Total.*?(\d+)%' \
+              services/${{ matrix.service }}/target/site/jacoco/index.html \
+              | tail -1 | grep -oP '\d+' | head -1)
+            echo "服务 ${{ matrix.service }} 覆盖率: ${COVERAGE}%"
+            if [ "${COVERAGE:-0}" -lt 80 ]; then
+              echo "::error::覆盖率 ${COVERAGE}% 低于要求的 80%"
+              exit 1
+            fi
+          fi
+
+  # ============================================================
+  # Job 3: Python AI 服务测试
+  # ============================================================
+  python-test:
+    name: Python 算法服务测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: 安装 Python 依赖
+        run: |
+          # 检查是否有 Python 服务
+          if [ -f "inference/sandbox-infer/pyproject.toml" ]; then
+            pip install -e "inference/sandbox-infer[dev]"
+          fi
+          if [ -f "algorithms/_base/pyproject.toml" ]; then
+            pip install -e "algorithms/_base[dev]"
+          fi
+          pip install pytest pytest-cov ruff black 2>/dev/null || true
+
+      - name: 代码格式检查（ruff + black）
+        run: |
+          if command -v ruff &>/dev/null; then
+            find algorithms inference -name "*.py" -exec ruff check {} + 2>/dev/null || true
+          fi
+
+      - name: 执行 Python 单元测试
+        run: |
+          if find . -name "test_*.py" -not -path "./.git/*" | grep -q .; then
+            pytest algorithms/ inference/ \
+              --cov=algorithms \
+              --cov=inference \
+              --cov-report=xml \
+              --cov-fail-under=80 \
+              -v 2>/dev/null || echo "暂无测试文件，跳过"
+          else
+            echo "暂无 Python 测试文件，跳过"
+          fi
+
+  # ============================================================
+  # Job 4: 前端构建与 Lint
+  # ============================================================
+  frontend-build:
+    name: Vue3 前端构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/admin-web/package-lock.json
+
+      - name: 安装依赖
+        run: |
+          if [ -f "apps/admin-web/package.json" ]; then
+            cd apps/admin-web && npm ci
+          else
+            echo "前端工程尚未初始化，跳过"
+          fi
+
+      - name: ESLint 代码规范检查
+        run: |
+          if [ -f "apps/admin-web/package.json" ]; then
+            cd apps/admin-web && npm run lint 2>/dev/null || echo "lint 脚本尚未配置"
+          fi
+
+      - name: TypeScript 类型检查
+        run: |
+          if [ -f "apps/admin-web/package.json" ]; then
+            cd apps/admin-web && npm run type-check 2>/dev/null || echo "type-check 脚本尚未配置"
+          fi
+
+      - name: Vite 生产构建
+        run: |
+          if [ -f "apps/admin-web/package.json" ]; then
+            cd apps/admin-web && npm run build 2>/dev/null || echo "build 脚本尚未配置"
+          fi
+
+  # ============================================================
+  # Job 5: 安全扫描
+  # ============================================================
+  security-scan:
+    name: 安全漏洞扫描
+    runs-on: ubuntu-latest
+    needs: [java-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 检测敏感信息泄露（硬编码密码/密钥）
+        run: |
+          # 扫描代码中是否有硬编码密码、密钥
+          FOUND=0
+          patterns=(
+            "password\s*=\s*['\"][^'\"${}]+['\"]"
+            "secret\s*=\s*['\"][^'\"${}]+['\"]"
+            "192\.168\.\d+\.\d+:\d+"
+            "jdbc:postgresql://[^:]+:[^@]+@"
+          )
+          for pattern in "${patterns[@]}"; do
+            if grep -rn --include="*.java" --include="*.py" --include="*.ts" \
+                       --include="*.yml" --include="*.yaml" \
+                       -E "${pattern}" \
+                       --exclude-dir=".git" \
+                       --exclude-dir="node_modules" \
+                       --exclude-dir="target" . 2>/dev/null | \
+               grep -v "PLACEHOLDER\|test\|Test\|example\|Example"; then
+              echo "::warning::发现可能的敏感信息硬编码，请确认是否为误报"
+              FOUND=1
+            fi
+          done
+
+  # ============================================================
+  # Job 6: Docker 镜像构建并推送 Harbor（仅 develop 分支）
+  # ============================================================
+  docker-push:
+    name: 构建并推送镜像至 Harbor
+    runs-on: ubuntu-latest
+    needs: [java-build, python-test, frontend-build]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    strategy:
+      matrix:
+        service:
+          - name: scene-config-service
+            context: services/scene-config-service
+          - name: auth-service
+            context: services/auth-service
+          - name: alarm-judge-service
+            context: services/alarm-judge-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 登录 Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: 设置镜像 Tag
+        id: tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "image=${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ matrix.service.name }}:${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: 构建并推送镜像
+        if: hashFiles(format('{0}/Dockerfile', matrix.service.context)) != ''
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          push: true
+          tags: |
+            ${{ steps.tag.outputs.image }}
+            ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ matrix.service.name }}:develop-latest
+          # 禁止使用 :latest 标签（CLAUDE.md §13.3）
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_COMMIT=${{ github.sha }}

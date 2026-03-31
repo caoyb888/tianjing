@@ -1,0 +1,52 @@
+# ============================================================
+# TDengine 3.x Helm Values
+# Namespace: middleware
+# Sprint: S0-02
+# ============================================================
+
+replicaCount: 3
+
+image:
+  repository: tdengine/tdengine
+  tag: "3.3.2.0"
+  pullPolicy: IfNotPresent
+
+persistence:
+  enabled: true
+  storageClass: "standard"
+  size: 200Gi
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    cpu: 4
+    memory: 8Gi
+
+# TDengine 核心配置
+config:
+  # 时序数据保留策略（由子表 TTL 控制，此处设最大值）
+  keepDefault: 180
+  # 查询并发数
+  numOfCommitThreads: 4
+  numOfMnodeQueryThreads: 4
+  # 写入缓冲区
+  walLevel: 1
+  cacheLast: 2
+  # 日志
+  debugFlag: 131
+
+service:
+  type: ClusterIP
+  ports:
+    tcp: 6030
+    http: 6041
+
+# 初始化超级表（通过 post-install Job 执行）
+# 完整 DDL 在 scripts/tdengine-init.sql
+initJob:
+  enabled: true
+  image:
+    repository: tdengine/tdengine
+    tag: "3.3.2.0"
