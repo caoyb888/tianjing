@@ -4,26 +4,37 @@ import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 import type { ApiResponse } from '@/types'
 
-// 配置 NProgress
 NProgress.configure({ showSpinner: false })
+
+// 生成简单 trace_id（UUID v4 简化版）
+function generateTraceId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
 
 const request = axios.create({
   baseURL: '/api/v1',
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 })
 
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
     NProgress.start()
-    // Token 注入（从 authStore 获取，避免循环依赖用动态导入）
-    const token = localStorage.getItem('_tj_access_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
+    // Token 从 authStore 获取（内存存储，禁止 localStorage）
+    // 动态导入避免循环依赖
+    try {
+      const { useAuthStore } = require('@/stores/auth')
+      const authStore = useAuthStore()
+      if (authStore.accessToken) {
+        config.headers.Authorization = `Bearer ${authStore.accessToken}`
+      }
+    } catch {}
+    // 每个请求注入 trace_id
+    config.headers['X-Trace-Id'] = generateTraceId()
     return config
   },
   (error) => {
@@ -38,7 +49,6 @@ request.interceptors.response.use(
     NProgress.done()
     const { data } = response
     if (data.code !== 0) {
-      // 处理业务错误
       ElMessage.error(data.message || '操作失败')
       return Promise.reject(new Error(data.message))
     }
@@ -47,23 +57,22 @@ request.interceptors.response.use(
   async (error) => {
     NProgress.done()
     if (error.response?.status === 401) {
-      // Token 过期，尝试刷新
-      const refreshToken = localStorage.getItem('_tj_refresh_token')
-      if (refreshToken) {
-        try {
-          const res = await axios.post('/api/v1/auth/refresh', { refresh_token: refreshToken })
+      // Token 过期，尝试静默刷新
+      try {
+        const { useAuthStore } = require('@/stores/auth')
+        const authStore = useAuthStore()
+        if (authStore.refreshToken) {
+          const res = await axios.post('/api/v1/auth/refresh', {
+            refresh_token: authStore.refreshToken,
+          })
           if (res.data.code === 0) {
-            localStorage.setItem('_tj_access_token', res.data.data.access_token)
-            // 重试原始请求
+            authStore.setTokens(res.data.data.access_token, res.data.data.refresh_token)
             error.config.headers.Authorization = `Bearer ${res.data.data.access_token}`
             return request(error.config)
           }
-        } catch {
-          // 刷新失败，跳转登录
         }
-      }
-      localStorage.removeItem('_tj_access_token')
-      localStorage.removeItem('_tj_refresh_token')
+        authStore.clearTokens()
+      } catch {}
       window.location.href = '/login'
     } else if (error.response?.status === 403) {
       ElMessage.error('权限不足')

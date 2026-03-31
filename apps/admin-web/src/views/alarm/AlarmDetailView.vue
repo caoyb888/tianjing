@@ -11,20 +11,19 @@
 
     <el-row :gutter="16" v-if="alarm">
       <el-col :lg="14" :md="24">
-        <!-- 告警图像 -->
+        <!-- 告警图像（Canvas 叠加检测框） -->
         <el-card shadow="never" class="image-card">
-          <template #header><span class="card-title">告警图像</span></template>
-          <el-image
-            :src="alarm.imageUrl"
-            fit="contain"
-            :preview-src-list="[alarm.imageUrl]"
-            class="alarm-image"
-          >
-            <template #error>
-              <div class="image-error">图像加载失败</div>
-            </template>
-          </el-image>
-          <!-- Sandbox 告警加虚线标注提示 -->
+          <template #header>
+            <span class="card-title">告警图像</span>
+            <el-tag v-if="alarm.isSandbox" type="warning" size="small" style="margin-left: 8px">
+              Sandbox · 虚线框
+            </el-tag>
+          </template>
+          <AlarmImageViewer
+            :image-url="alarm.imageUrl"
+            :detections="flatDetections"
+            :is-sandbox="alarm.isSandbox"
+          />
           <el-alert v-if="alarm.isSandbox" type="warning" :closable="false" show-icon style="margin-top: 8px">
             此为 Sandbox 推理结果，标注框以虚线显示，不触发生产告警
           </el-alert>
@@ -77,11 +76,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import AlarmImageViewer from '@/components/business/AlarmImageViewer.vue'
 import { alarmApi } from '@/api/alarm'
 import { FACTORY_CONFIG } from '@/constants'
 import { AlarmLevel, type AlarmRecord } from '@/types'
@@ -93,6 +93,18 @@ const alarm = ref<AlarmRecord | null>(null)
 const loading = ref(false)
 const showFeedback = ref(false)
 const submitting = ref(false)
+
+// 将 AlarmDetection.bbox 展开为 AlarmImageViewer 需要的扁平格式
+const flatDetections = computed(() =>
+  (alarm.value?.detections || []).map((d) => ({
+    x1: d.bbox.x1,
+    y1: d.bbox.y1,
+    x2: d.bbox.x2,
+    y2: d.bbox.y2,
+    class_name: d.class_name,
+    confidence: d.confidence,
+  }))
+)
 
 const feedbackForm = reactive({
   feedback_type: 'confirm' as 'confirm' | 'reject',

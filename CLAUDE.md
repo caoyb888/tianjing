@@ -1035,6 +1035,10 @@ tianjing_model_retrain_trigger_total{scene_id}         # Counter
 5. 绕过 Nacos 配置中心硬编码业务参数
 6. 在非 training 命名空间的服务中引入 PyTorch 完整依赖
 7. 同一服务同时部署在 production 和 sandbox 命名空间
+8. 将任何服务端口配置为 8080 或 8088（开发服务器保留端口，已被其他 Docker 容器占用）
+   - 8080：禁止使用，由开发服务器其他 Docker 服务占用
+   - 8088：禁止使用，由开发服务器其他 Docker 服务占用
+   - 如需新增服务端口，从 8102 起续编，并在 docs/天柱天镜_端口分配表_V1.0.md 中登记
 ```
 
 ### P2 — 工程规范（Code Review 必须修复）

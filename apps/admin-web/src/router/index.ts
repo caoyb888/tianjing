@@ -206,6 +206,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/training/TrainingJobDetailView.vue'),
         meta: { title: '作业详情', roles: [UserRole.ADMIN, UserRole.SCENE_EDITOR] },
       },
+      // 感知健康看板
+      {
+        path: 'health-monitor',
+        name: 'HealthMonitor',
+        component: () => import('@/views/HealthMonitorView.vue'),
+        meta: { title: '感知健康看板', icon: 'Monitor' },
+      },
       // 漂移监测
       {
         path: 'drift',

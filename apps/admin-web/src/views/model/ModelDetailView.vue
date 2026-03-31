@@ -6,15 +6,29 @@
     >
       <template #actions>
         <el-button @click="$router.back()">返回</el-button>
+        <el-tooltip
+          v-if="model?.status === 'pending_review' && canReview && isSameUser"
+          content="四眼原则：审核人不能与提交人相同"
+          placement="top"
+        >
+          <el-button type="success" disabled>审批通过</el-button>
+        </el-tooltip>
         <el-button
-          v-if="model?.status === 'pending_review' && canReview"
+          v-if="model?.status === 'pending_review' && canReview && !isSameUser"
           type="success"
           @click="approve(true)"
         >
           审批通过
         </el-button>
+        <el-tooltip
+          v-if="model?.status === 'pending_review' && canReview && isSameUser"
+          content="四眼原则：审核人不能与提交人相同"
+          placement="top"
+        >
+          <el-button type="danger" disabled>审批拒绝</el-button>
+        </el-tooltip>
         <el-button
-          v-if="model?.status === 'pending_review' && canReview"
+          v-if="model?.status === 'pending_review' && canReview && !isSameUser"
           type="danger"
           @click="approve(false)"
         >
@@ -29,6 +43,11 @@
         </el-button>
       </template>
     </PageHeader>
+
+    <!-- 状态步骤条 -->
+    <el-card shadow="never" style="margin-bottom: 16px" v-if="model">
+      <ModelStatusStepper :status="model.status" />
+    </el-card>
 
     <el-row :gutter="16" v-if="model">
       <el-col :md="12">
@@ -56,6 +75,16 @@
             模型审核须由与提交人不同的 MODEL_REVIEWER 完成（四眼原则）。
             审核人与提交人相同时，系统返回错误码 4004。
           </el-alert>
+          <el-alert
+            v-if="isSameUser && model?.status === 'pending_review'"
+            type="warning"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 12px"
+          >
+            当前登录用户（{{ authStore.username }}）为该模型提交人，无法执行审批操作。
+            请由其他 MODEL_REVIEWER 完成审批。
+          </el-alert>
           <el-descriptions :column="1" border size="small">
             <el-descriptions-item label="Sandbox 会话">
               <el-button
@@ -79,6 +108,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
+import ModelStatusStepper from '@/components/business/ModelStatusStepper.vue'
 import { modelApi } from '@/api/model'
 import { MODEL_STATUS_CONFIG } from '@/constants'
 import { UserRole, ModelStatus, type ModelVersion } from '@/types'
@@ -91,6 +121,10 @@ const authStore = useAuthStore()
 const model = ref<ModelVersion | null>(null)
 const loading = ref(false)
 const canReview = computed(() => authStore.hasRole([UserRole.ADMIN, UserRole.MODEL_REVIEWER]))
+// 四眼原则：审核人不能与提交人相同
+const isSameUser = computed(
+  () => !!model.value && model.value.submittedBy === authStore.username
+)
 
 async function loadModel() {
   loading.value = true

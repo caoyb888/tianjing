@@ -100,7 +100,7 @@ function stopPolling() {
 
 onMounted(() => {
   loadTask()
-  pollTimer = setInterval(loadTask, 3000)
+  pollTimer = setInterval(loadTask, 10000)
 })
 onUnmounted(stopPolling)
 </script>

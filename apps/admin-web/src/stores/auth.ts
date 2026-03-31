@@ -4,9 +4,9 @@ import type { UserInfo, UserRole } from '@/types'
 import { authApi } from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', () => {
-  // 注意：Token 存储在 localStorage，但 Store 中用 ref 作为响应式副本
-  const accessToken = ref<string>(localStorage.getItem('_tj_access_token') || '')
-  const refreshToken = ref<string>(localStorage.getItem('_tj_refresh_token') || '')
+  // Token 只存内存，禁止持久化至 localStorage（安全规范）
+  const accessToken = ref<string>('')
+  const refreshToken = ref<string>('')
   const userInfo = ref<UserInfo | null>(null)
 
   const isLoggedIn = computed(() => !!accessToken.value)
@@ -16,16 +16,12 @@ export const useAuthStore = defineStore('auth', () => {
   function setTokens(access: string, refresh: string) {
     accessToken.value = access
     refreshToken.value = refresh
-    localStorage.setItem('_tj_access_token', access)
-    localStorage.setItem('_tj_refresh_token', refresh)
   }
 
   function clearTokens() {
     accessToken.value = ''
     refreshToken.value = ''
     userInfo.value = null
-    localStorage.removeItem('_tj_access_token')
-    localStorage.removeItem('_tj_refresh_token')
   }
 
   async function login(username: string, password: string) {
@@ -51,7 +47,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 检查角色权限
   function hasRole(role: UserRole | UserRole[]): boolean {
     const checkRoles = Array.isArray(role) ? role : [role]
     return roles.value.some((r) => checkRoles.includes(r as UserRole))

@@ -88,6 +88,14 @@ export interface UserInfo {
   email?: string
 }
 
+// 告警检测框
+export interface AlarmDetection {
+  class_id: number
+  class_name: string
+  confidence: number
+  bbox: { x1: number; y1: number; x2: number; y2: number }
+}
+
 // 告警记录
 export interface AlarmRecord {
   alarmId: string
@@ -100,6 +108,7 @@ export interface AlarmRecord {
   timestamp: string
   isSandbox: boolean
   feedbackStatus?: 'pending' | 'confirmed' | 'rejected'
+  detections?: AlarmDetection[]
 }
 
 // 设备信息

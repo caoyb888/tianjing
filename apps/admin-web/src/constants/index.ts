@@ -125,6 +125,12 @@ export const SIDEBAR_MENUS = [
     ],
   },
   {
+    path: '/health-monitor',
+    title: '感知健康看板',
+    icon: 'Monitor',
+    roles: [],
+  },
+  {
     path: '/drift',
     title: '漂移监测',
     icon: 'Odometer',

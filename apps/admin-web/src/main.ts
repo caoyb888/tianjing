@@ -7,6 +7,7 @@ import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import App from './App.vue'
 import router from './router'
+import { permissionDirective } from './directives/permission'
 import './styles/index.scss'
 
 const app = createApp(App)
@@ -17,6 +18,7 @@ pinia.use(piniaPersistedstate)
 app.use(pinia)
 app.use(router)
 app.use(ElementPlus, { locale: undefined })
+app.directive('permission', permissionDirective)
 
 // 注册 Element Plus 图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

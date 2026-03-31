@@ -29,7 +29,7 @@
         <el-card shadow="never" class="chart-card">
           <template #header>
             <div class="card-header">
-              <span class="card-title">推理量趋势（近 24h）</span>
+              <span class="card-title">推理量趋势（近 7 天）</span>
               <el-select v-model="trendScene" placeholder="全部场景" clearable size="small" style="width: 160px">
                 <el-option label="全部场景" value="" />
               </el-select>
@@ -148,7 +148,7 @@ async function loadData() {
   try {
     const [overviewRes, trendRes] = await Promise.all([
       dashboardApi.getOverview(),
-      dashboardApi.getInferenceTrend({ interval: '1h' }),
+      dashboardApi.getInferenceTrend({ interval: '1d', days: 7 }),
     ])
     overview.value = overviewRes.data.data
     trendData.value = trendRes.data.data

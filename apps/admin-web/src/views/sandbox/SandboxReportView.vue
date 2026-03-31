@@ -74,6 +74,17 @@
       </el-row>
     </div>
 
+      <!-- 样本帧对比 -->
+      <el-card shadow="never" style="margin-top: 16px" v-if="report.sample_frame">
+        <template #header><span class="card-title">样本帧检测对比（生产 vs Sandbox）</span></template>
+        <SandboxCompareViewer
+          :image-url="report.sample_frame.image_url"
+          :production-detections="report.sample_frame.production_detections"
+          :sandbox-detections="report.sample_frame.sandbox_detections"
+        />
+      </el-card>
+    </div>
+
     <EmptyState v-else-if="!loading" description="报告生成中，请稍后刷新" />
 
     <!-- 申请转正对话框 -->
@@ -101,6 +112,7 @@ import { Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import SandboxCompareViewer from '@/components/business/SandboxCompareViewer.vue'
 import { sandboxApi } from '@/api/sandbox'
 
 const route = useRoute()
