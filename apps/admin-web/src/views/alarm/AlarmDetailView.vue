@@ -54,6 +54,49 @@
       </el-col>
     </el-row>
 
+    <!-- 告警时间轴（S2-09：展示派发→处置流程） -->
+    <el-card shadow="never" style="margin-top: 16px" v-if="alarm">
+      <template #header><span class="card-title">处置时间轴</span></template>
+      <el-timeline>
+        <el-timeline-item
+          :timestamp="formatDateTime(alarm.timestamp)"
+          placement="top"
+          type="primary"
+        >
+          <span class="tl-title">告警检出</span>
+          <span class="tl-desc">{{ alarm.anomalyType }}，置信度 {{ formatConfidence(alarm.confidence) }}，场景 {{ alarm.sceneId }}</span>
+        </el-timeline-item>
+
+        <el-timeline-item
+          :timestamp="formatDateTime(alarm.timestamp)"
+          placement="top"
+          :type="pushStatusType(alarm.pushStatus)"
+        >
+          <span class="tl-title">告警派发</span>
+          <span class="tl-desc">{{ pushStatusLabel(alarm.pushStatus, alarm.isSandbox) }}</span>
+        </el-timeline-item>
+
+        <el-timeline-item
+          v-if="alarm.feedbackStatus && alarm.feedbackStatus !== 'pending'"
+          :timestamp="alarm.feedbackAt ? formatDateTime(alarm.feedbackAt) : ''"
+          placement="top"
+          type="success"
+        >
+          <span class="tl-title">人工处置</span>
+          <span class="tl-desc">{{ feedbackStatusMap[alarm.feedbackStatus]?.label }}</span>
+        </el-timeline-item>
+
+        <el-timeline-item
+          v-else
+          placement="top"
+          type="info"
+        >
+          <span class="tl-title">等待处置</span>
+          <span class="tl-desc">尚未提交人工复核结果</span>
+        </el-timeline-item>
+      </el-timeline>
+    </el-card>
+
     <!-- 处置表单 -->
     <el-dialog v-model="showFeedback" title="提交处置结果" width="480px">
       <el-form :model="feedbackForm" label-width="100px">
@@ -124,6 +167,25 @@ function levelType(level: AlarmLevel) {
   return (map[level] || 'info') as 'danger' | 'warning' | 'info'
 }
 
+function pushStatusType(pushStatus?: string) {
+  if (!pushStatus || pushStatus === 'PENDING') return 'info'
+  if (pushStatus === 'SUCCESS') return 'success'
+  if (pushStatus === 'FAILED') return 'danger'
+  if (pushStatus === 'INTERCEPTED') return 'warning'
+  return 'info'
+}
+
+function pushStatusLabel(pushStatus: string | undefined, isSandbox: boolean) {
+  if (isSandbox) return 'Sandbox 拦截器阻止外部推送，结果写入实验室数据库'
+  const map: Record<string, string> = {
+    PENDING:     '等待推送至 notification-service',
+    SUCCESS:     '已成功推送至通知服务（企业微信 / MQTT / 工单）',
+    FAILED:      '推送失败，可手动重推',
+    INTERCEPTED: 'Sandbox 拦截器已拦截，未触发外部推送',
+  }
+  return map[pushStatus || 'PENDING'] ?? '推送状态未知'
+}
+
 async function loadAlarm() {
   loading.value = true
   try {
@@ -162,4 +224,12 @@ onMounted(loadAlarm)
   color: #c0c4cc;
 }
 .card-title { font-weight: 600; }
+.tl-title {
+  font-weight: 600;
+  margin-right: 8px;
+}
+.tl-desc {
+  color: #606266;
+  font-size: 13px;
+}
 </style>

@@ -108,6 +108,10 @@ export interface AlarmRecord {
   imageUrl: string
   timestamp: string
   isSandbox: boolean
+  /** 推送状态：PENDING / SUCCESS / FAILED / INTERCEPTED */
+  pushStatus?: string
+  /** 人工处置时间 */
+  feedbackAt?: string
   feedbackStatus?: 'pending' | 'TRUE_POSITIVE' | 'FALSE_POSITIVE' | 'FALSE_NEGATIVE'
   detections?: AlarmDetection[]
 }
