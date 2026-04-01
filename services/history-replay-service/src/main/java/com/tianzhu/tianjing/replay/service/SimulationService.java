@@ -81,7 +81,7 @@ public class SimulationService {
                     .build());
         } catch (Exception e) {
             log.error("视频上传 MinIO 失败 object={}", objectPath, e);
-            throw BusinessException.of(ErrorCode.INTERNAL_SERVER_ERROR, "视频上传失败：" + e.getMessage());
+            throw BusinessException.of(ErrorCode.INTERNAL_ERROR, "视频上传失败：" + e.getMessage());
         }
 
         String url = minioEndpoint + "/" + simBucket + "/" + objectPath;

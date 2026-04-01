@@ -1,6 +1,6 @@
 package com.tianzhu.tianjing.route.controller;
 
-import com.tianzhu.tianjing.common.ApiResponse;
+import com.tianzhu.tianjing.common.response.ApiResponse;
 import com.tianzhu.tianjing.route.service.RouteConfigCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

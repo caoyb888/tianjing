@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: notification-service
+  data:
+    redis:
+      host: ${TIANJING_REDIS_HOST:localhost}
+      port: ${TIANJING_REDIS_PORT:6379}
+      password: ${TIANJING_REDIS_PASSWORD:}
   kafka:
     bootstrap-servers: ${TIANJING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:

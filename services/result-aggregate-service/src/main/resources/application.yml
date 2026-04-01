@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: result-aggregate-service
+  data:
+    redis:
+      host: ${TIANJING_REDIS_HOST:localhost}
+      port: ${TIANJING_REDIS_PORT:6379}
+      password: ${TIANJING_REDIS_PASSWORD:}
   kafka:
     bootstrap-servers: ${TIANJING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:
@@ -15,8 +20,8 @@ spring:
   # TDengine WebSocket 数据源（规范：CLAUDE.md §7.2；使用 WS 驱动，无需 native lib）
   datasource:
     tdengine:
-      driver-class-name: com.taosdata.jdbc.ws.WebSocketDriver
-      url: ${TIANJING_TDENGINE_URL:jdbc:TAOS-WS://tdengine:6041/tianjing_prod?timezone=UTC}
+      driver-class-name: com.taosdata.jdbc.rs.RestfulDriver
+      url: ${TIANJING_TDENGINE_URL:jdbc:TAOS-RS://tdengine:6041/tianjing_ts?timezone=UTC}
       username: ${TIANJING_TDENGINE_USER:root}
       password: ${TIANJING_TDENGINE_PASSWORD:taosdata}
 

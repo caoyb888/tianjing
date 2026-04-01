@@ -1,5 +1,6 @@
 package com.tianzhu.tianjing.stream.controller;
 
+import com.tianzhu.tianjing.common.exception.ErrorCode;
 import com.tianzhu.tianjing.common.response.ApiResponse;
 import com.tianzhu.tianjing.stream.domain.StreamChannel;
 import com.tianzhu.tianjing.stream.dto.StreamChannelRequest;
@@ -32,7 +33,7 @@ public class StreamChannelController {
     public ApiResponse<StreamChannel> getChannel(@PathVariable String sceneId) {
         return streamIngestService.getChannel(sceneId)
                 .map(ApiResponse::ok)
-                .orElseGet(() -> ApiResponse.notFound("通道不存在: " + sceneId));
+                .orElseGet(() -> ApiResponse.error(ErrorCode.SCENE_NOT_FOUND, "通道不存在: " + sceneId));
     }
 
     @PostMapping
