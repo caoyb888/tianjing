@@ -298,7 +298,7 @@ CREATE TRIGGER trg_calibration_updated_at
 -- ============================================================
 CREATE TABLE algorithm_plugin (
     id               BIGSERIAL     PRIMARY KEY,
-    plugin_id        VARCHAR(64)   NOT NULL,
+    plugin_id        VARCHAR(64)   NOT NULL UNIQUE,  -- 列级唯一约束，满足自引用 FK 的参照要求
     plugin_name      VARCHAR(128)  NOT NULL,
     plugin_type      VARCHAR(32)   NOT NULL,
     is_atom          BOOLEAN       NOT NULL DEFAULT TRUE,
@@ -322,11 +322,6 @@ CREATE TABLE algorithm_plugin (
     CONSTRAINT ck_infer_backend    CHECK (infer_backend IN ('LOCAL_GPU','CLOUD_API','ONNX_CPU')),
     CONSTRAINT fk_plugin_parent    FOREIGN KEY (parent_plugin_id) REFERENCES algorithm_plugin(plugin_id)
 );
-
--- 部分索引：软删除后同编码可重新注册
-CREATE UNIQUE INDEX uq_plugin_id_active
-    ON algorithm_plugin (plugin_id)
-    WHERE is_deleted = FALSE;
 
 COMMENT ON TABLE  algorithm_plugin                  IS '算法插件注册表，包含原子算法和场景任务头两类';
 COMMENT ON COLUMN algorithm_plugin.plugin_id        IS '插件全局唯一ID，格式：ATOM-DETECT-YOLO-V1 或 HEAD-SIDEPLATE-V1';
