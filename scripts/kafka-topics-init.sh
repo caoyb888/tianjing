@@ -69,6 +69,8 @@ create_topic "tianjing.infer.result.sandbox"    8  "604800000"
 # ==============================
 echo "--- 告警 Topics ---"
 # CRITICAL 告警（消费者：notification-service，不丢失）
+# 注：acks=all 是生产者参数，不能作为 topic config
+#     min.insync.replicas 在单节点环境下设为 1，生产多节点集群改回 2
 kafka-topics.sh \
     --bootstrap-server "${KAFKA_BOOTSTRAP}" \
     --create \
@@ -78,8 +80,7 @@ kafka-topics.sh \
     --replication-factor "${REPLICATION_FACTOR}" \
     --config "retention.ms=2592000000" \
     --config "compression.type=lz4" \
-    --config "min.insync.replicas=2" \
-    --config "acks=all"
+    --config "min.insync.replicas=1"
 echo "  ✓ tianjing.alarm.critical created"
 
 # WARNING 告警
