@@ -13,6 +13,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVICES_DIR="$ROOT_DIR/services"
+NGINX_CONF="$ROOT_DIR/deploy/docker/nginx/gateway.conf"
 LOG_DIR="/tmp/tianjing-logs"
 
 mkdir -p "$LOG_DIR"
@@ -140,6 +141,47 @@ build_all() {
   echo -e "${GREEN}构建完成${RESET}"
 }
 
+# ─── Nginx 网关 ───────────────────────────────────────────────────────────────
+
+start_gateway() {
+  if docker inspect tianjing-gateway &>/dev/null; then
+    local state
+    state=$(docker inspect -f '{{.State.Running}}' tianjing-gateway 2>/dev/null)
+    if [ "$state" = "true" ]; then
+      echo -e "  ${CYAN}跳过${RESET} tianjing-gateway — 已运行（port=8079）"
+      return 0
+    else
+      docker rm tianjing-gateway &>/dev/null || true
+    fi
+  fi
+  docker run -d \
+    --name tianjing-gateway \
+    --add-host=host.docker.internal:host-gateway \
+    -p 8079:8079 \
+    -v "$NGINX_CONF:/etc/nginx/conf.d/gateway.conf:ro" \
+    nginx:1.25-alpine &>/dev/null
+  echo -e "  ${GREEN}已启动${RESET} tianjing-gateway  (port=8079)"
+}
+
+stop_gateway() {
+  if docker inspect tianjing-gateway &>/dev/null; then
+    docker rm -f tianjing-gateway &>/dev/null && \
+      echo -e "  ${YELLOW}停止${RESET} tianjing-gateway" || true
+  fi
+}
+
+gateway_status() {
+  local state
+  state=$(docker inspect -f '{{.State.Running}}' tianjing-gateway 2>/dev/null || echo "missing")
+  if [ "$state" = "true" ]; then
+    printf "  ${GREEN}✅ UP${RESET}  %-35s port=%s\n" "tianjing-gateway (nginx)" "8079"
+    return 0
+  else
+    printf "  ${RED}❌ DOWN   ${RESET} %-35s port=%s\n" "tianjing-gateway (nginx)" "8079"
+    return 1
+  fi
+}
+
 show_status() {
   echo -e "\n${BOLD}═══ 服务健康状态 ═══${RESET}"
   local ok=0 fail=0
@@ -174,11 +216,13 @@ case "$MODE" in
     for entry in "${SERVICES[@]}"; do
       stop_service "${entry%%:*}" "${entry##*:}"
     done
+    stop_gateway
     echo -e "${GREEN}完成${RESET}"
     exit 0
     ;;
 
   --status)
+    gateway_status || true
     show_status
     exit 0
     ;;
@@ -193,6 +237,7 @@ case "$MODE" in
     for entry in "${SERVICES[@]}"; do
       stop_service "${entry%%:*}" "${entry##*:}"
     done
+    stop_gateway
     sleep 2
     MODE="start"
     ;;
@@ -207,8 +252,9 @@ case "$MODE" in
     ;;
 esac
 
-# ─── 启动所有服务 ─────────────────────────────────────────────────────────────
-echo -e "\n${BOLD}▶ 启动后端服务...${RESET}"
+# ─── 启动网关 + 所有服务 ──────────────────────────────────────────────────────
+echo -e "\n${BOLD}▶ 启动 API 网关 + 后端服务...${RESET}"
+start_gateway
 for entry in "${SERVICES[@]}"; do
   start_service "${entry%%:*}" "${entry##*:}"
 done
@@ -217,4 +263,5 @@ done
 echo -e "\n${CYAN}等待服务启动（约 45 秒）...${RESET}"
 sleep 45
 
+gateway_status || true
 show_status
