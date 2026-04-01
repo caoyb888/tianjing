@@ -143,12 +143,12 @@ public class WorkflowService {
 
     private void validateNodes(List<WorkflowNode> nodes) {
         if (nodes == null || nodes.isEmpty()) {
-            throw BusinessException.of(ErrorCode.PARAM_INVALID, "工作流节点不能为空");
+            throw BusinessException.of(ErrorCode.PARAM_MISSING, "工作流节点不能为空");
         }
 
         for (WorkflowNode node : nodes) {
             if (!VALID_NODE_TYPES.contains(node.getType())) {
-                throw BusinessException.of(ErrorCode.PARAM_INVALID,
+                throw BusinessException.of(ErrorCode.PARAM_ENUM_INVALID,
                         "不合法的节点类型: " + node.getType() + "，允许类型: " + VALID_NODE_TYPES);
             }
         }
@@ -158,10 +158,10 @@ public class WorkflowService {
         long alarmOutCount = nodes.stream().filter(n -> "ALARM_OUT".equals(n.getType())).count();
 
         if (frameInCount != 1) {
-            throw BusinessException.of(ErrorCode.PARAM_INVALID, "工作流必须有且仅有一个 FRAME_IN 节点");
+            throw BusinessException.of(ErrorCode.PARAM_MISSING, "工作流必须有且仅有一个 FRAME_IN 节点");
         }
         if (alarmOutCount != 1) {
-            throw BusinessException.of(ErrorCode.PARAM_INVALID, "工作流必须有且仅有一个 ALARM_OUT 节点");
+            throw BusinessException.of(ErrorCode.PARAM_MISSING, "工作流必须有且仅有一个 ALARM_OUT 节点");
         }
     }
 
