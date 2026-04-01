@@ -38,7 +38,7 @@ public class CameraDevice {
     private String healthStatus;
 
     @TableLogic
-    private Integer isDeleted;
+    private Boolean isDeleted;
 
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;

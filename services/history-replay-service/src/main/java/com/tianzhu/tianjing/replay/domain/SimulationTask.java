@@ -28,7 +28,7 @@ public class SimulationTask {
     private OffsetDateTime uploadedAt;
     private OffsetDateTime startedAt;
     private OffsetDateTime completedAt;
-    @TableLogic private Integer isDeleted;
+    @TableLogic private Boolean isDeleted;
     @TableField(fill = FieldFill.INSERT) private OffsetDateTime createdAt;
     private String createdBy;
 }

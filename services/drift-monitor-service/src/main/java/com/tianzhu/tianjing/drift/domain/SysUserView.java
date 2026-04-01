@@ -11,6 +11,6 @@ public class SysUserView {
     private String displayName;
     private String email;
     private String status;
-    @TableLogic private Integer isDeleted;
+    @TableLogic private Boolean isDeleted;
     @TableField(fill = FieldFill.INSERT) private OffsetDateTime createdAt;
 }

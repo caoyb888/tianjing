@@ -31,7 +31,7 @@ public class SysUser {
     private OffsetDateTime passwordChangedAt;
 
     @TableLogic
-    private Integer isDeleted;
+    private Boolean isDeleted;
 
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;

@@ -229,7 +229,7 @@ public class SceneConfigService {
     private SceneConfig findActiveOrThrow(String sceneId) {
         SceneConfig scene = sceneMapper.selectOne(new LambdaQueryWrapper<SceneConfig>()
                 .eq(SceneConfig::getSceneId, sceneId)
-                .eq(SceneConfig::getIsDeleted, 0));
+                );
         if (scene == null) {
             throw BusinessException.notFound(ErrorCode.SCENE_NOT_FOUND);
         }

@@ -23,7 +23,7 @@ public class AlgorithmPlugin {
     private String inferBackend;
     private String status;
     @TableField(value = "version_lock") @Version private Integer versionLock;
-    @TableLogic private Integer isDeleted;
+    @TableLogic private Boolean isDeleted;
     @TableField(fill = FieldFill.INSERT) private OffsetDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE) private OffsetDateTime updatedAt;
     private String createdBy;

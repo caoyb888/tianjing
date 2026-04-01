@@ -24,8 +24,8 @@ mybatis-plus:
   global-config:
     db-config:
       logic-delete-field: isDeleted
-      logic-delete-value: 1
-      logic-not-delete-value: 0
+      logic-delete-value: "true"
+      logic-not-delete-value: "false"
 
 tianjing:
   jwt:

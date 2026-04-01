@@ -57,5 +57,5 @@ public class WorkflowDef {
 
     @TableLogic
     @TableField("is_deleted")
-    private Integer isDeleted;
+    private Boolean isDeleted;
 }

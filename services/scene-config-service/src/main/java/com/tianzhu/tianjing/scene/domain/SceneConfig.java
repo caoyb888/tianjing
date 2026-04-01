@@ -42,7 +42,7 @@ public class SceneConfig {
     private Integer version;
 
     @TableLogic
-    private Integer isDeleted;
+    private Boolean isDeleted;
 
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;

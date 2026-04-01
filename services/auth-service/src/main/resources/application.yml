@@ -29,8 +29,8 @@ mybatis-plus:
   global-config:
     db-config:
       logic-delete-field: isDeleted
-      logic-delete-value: 1
-      logic-not-delete-value: 0
+      logic-delete-value: "true"
+      logic-not-delete-value: "false"
 
 # JWT 密钥从 K8s Secret 注入（生产），开发模式留空触发警告
 tianjing:

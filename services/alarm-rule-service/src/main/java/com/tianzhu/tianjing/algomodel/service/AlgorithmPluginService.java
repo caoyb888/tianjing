@@ -24,7 +24,6 @@ public class AlgorithmPluginService {
     public PageResult<AlgorithmPlugin> listPlugins(int page, int size, String pluginType, String status) {
         Page<AlgorithmPlugin> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<AlgorithmPlugin> wrapper = new LambdaQueryWrapper<AlgorithmPlugin>()
-                .eq(AlgorithmPlugin::getIsDeleted, 0)
                 .eq(pluginType != null, AlgorithmPlugin::getPluginType, pluginType)
                 .eq(status != null, AlgorithmPlugin::getStatus, status)
                 .orderByDesc(AlgorithmPlugin::getCreatedAt);
@@ -34,7 +33,7 @@ public class AlgorithmPluginService {
 
     public AlgorithmPlugin getPlugin(String pluginId) {
         AlgorithmPlugin plugin = pluginMapper.selectOne(new LambdaQueryWrapper<AlgorithmPlugin>()
-                .eq(AlgorithmPlugin::getPluginId, pluginId).eq(AlgorithmPlugin::getIsDeleted, 0));
+                .eq(AlgorithmPlugin::getPluginId, pluginId));
         if (plugin == null) throw BusinessException.notFound(ErrorCode.ALGO_PLUGIN_NOT_FOUND);
         return plugin;
     }

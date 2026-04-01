@@ -43,7 +43,6 @@ public class SystemController {
             @RequestParam(required = false) String keyword) {
         Page<SysUserView> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<SysUserView> wrapper = new LambdaQueryWrapper<SysUserView>()
-                .eq(SysUserView::getIsDeleted, 0)
                 .like(keyword != null, SysUserView::getUsername, keyword)
                 .orderByDesc(SysUserView::getCreatedAt);
         var result = userMapper.selectPage(pageParam, wrapper);

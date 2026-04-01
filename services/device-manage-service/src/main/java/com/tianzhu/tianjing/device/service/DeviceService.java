@@ -42,7 +42,6 @@ public class DeviceService {
     public PageResult<DeviceDetail> listDevices(int page, int size, String sceneId, String healthStatus) {
         Page<CameraDevice> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<CameraDevice> wrapper = new LambdaQueryWrapper<CameraDevice>()
-                .eq(CameraDevice::getIsDeleted, 0)
                 .eq(StringUtils.isNotBlank(sceneId), CameraDevice::getSceneId, sceneId)
                 .eq(StringUtils.isNotBlank(healthStatus), CameraDevice::getHealthStatus, healthStatus)
                 .orderByDesc(CameraDevice::getCreatedAt);
@@ -62,7 +61,7 @@ public class DeviceService {
         // 校验设备编码唯一性
         Long existing = deviceMapper.selectCount(new LambdaQueryWrapper<CameraDevice>()
                 .eq(CameraDevice::getDeviceCode, request.deviceCode())
-                .eq(CameraDevice::getIsDeleted, 0));
+                );
         if (existing > 0) {
             throw BusinessException.of(ErrorCode.CAMERA_BIND_CONFLICT,
                     "设备编码已存在: " + request.deviceCode());
@@ -136,7 +135,7 @@ public class DeviceService {
     private CameraDevice findOrThrow(String deviceCode) {
         CameraDevice device = deviceMapper.selectOne(new LambdaQueryWrapper<CameraDevice>()
                 .eq(CameraDevice::getDeviceCode, deviceCode)
-                .eq(CameraDevice::getIsDeleted, 0));
+                );
         if (device == null) {
             throw BusinessException.notFound(ErrorCode.DEVICE_NOT_FOUND);
         }

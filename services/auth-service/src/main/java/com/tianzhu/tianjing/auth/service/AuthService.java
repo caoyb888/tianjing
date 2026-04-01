@@ -53,7 +53,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         SysUser user = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, request.username())
-                .eq(SysUser::getIsDeleted, 0));
+                );
 
         if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             if (user != null) {
@@ -90,7 +90,7 @@ public class AuthService {
 
         SysUser user = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, currentUser.getUsername())
-                .eq(SysUser::getIsDeleted, 0));
+                );
 
         if (user == null) {
             throw BusinessException.of(ErrorCode.USER_NOT_FOUND);
@@ -110,7 +110,7 @@ public class AuthService {
     public UserInfoResponse getCurrentUser(TianjingUserDetails currentUser) {
         SysUser user = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, currentUser.getUsername())
-                .eq(SysUser::getIsDeleted, 0));
+                );
 
         if (user == null) {
             throw BusinessException.of(ErrorCode.USER_NOT_FOUND);

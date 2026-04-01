@@ -46,7 +46,6 @@ public class SimulationService {
     public PageResult<SimulationTask> listTasks(int page, int size, String sceneId) {
         Page<SimulationTask> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<SimulationTask> wrapper = new LambdaQueryWrapper<SimulationTask>()
-                .eq(SimulationTask::getIsDeleted, 0)
                 .eq(sceneId != null, SimulationTask::getSceneId, sceneId)
                 .orderByDesc(SimulationTask::getCreatedAt);
         var result = taskMapper.selectPage(pageParam, wrapper);
@@ -56,7 +55,7 @@ public class SimulationService {
     public SimulationTask getTask(String taskId) {
         SimulationTask task = taskMapper.selectOne(new LambdaQueryWrapper<SimulationTask>()
                 .eq(SimulationTask::getTaskId, taskId)
-                .eq(SimulationTask::getIsDeleted, 0));
+                );
         if (task == null) throw BusinessException.notFound(ErrorCode.SIMULATION_TASK_NOT_FOUND);
         return task;
     }

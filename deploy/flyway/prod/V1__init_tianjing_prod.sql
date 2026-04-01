@@ -586,17 +586,21 @@ CREATE TABLE sys_user (
     dept_code    VARCHAR(64)  NULL,
     phone        VARCHAR(20)  NULL,
     email        VARCHAR(128) NULL,
-    last_login_at TIMESTAMPTZ NULL,
-    is_locked    BOOLEAN      NOT NULL DEFAULT FALSE,
-    is_deleted   BOOLEAN      NOT NULL DEFAULT FALSE,
-    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    created_by   VARCHAR(64)  NOT NULL,
-    updated_by   VARCHAR(64)  NOT NULL,
-    version      INTEGER      NOT NULL DEFAULT 1,
+    last_login_at        TIMESTAMPTZ  NULL,
+    status               VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE',
+    failed_login_count   INTEGER      NOT NULL DEFAULT 0,
+    password_changed_at  TIMESTAMPTZ  NULL,
+    is_locked            BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_deleted           BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    created_by           VARCHAR(64)  NOT NULL,
+    updated_by           VARCHAR(64)  NOT NULL,
+    version              INTEGER      NOT NULL DEFAULT 1,
 
     CONSTRAINT uk_user_id   UNIQUE (user_id),
-    CONSTRAINT uk_username  UNIQUE (username)
+    CONSTRAINT uk_username  UNIQUE (username),
+    CONSTRAINT ck_user_status CHECK (status IN ('ACTIVE','LOCKED','INACTIVE'))
 );
 
 COMMENT ON TABLE  sys_user               IS '系统用户表，对应平台管理后台的登录用户';
