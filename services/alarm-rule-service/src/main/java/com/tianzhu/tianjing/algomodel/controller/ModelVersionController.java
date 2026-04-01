@@ -51,6 +51,18 @@ public class ModelVersionController {
     }
 
     /**
+     * POST /models/{id}/promote — 提交审核（STAGING / SANDBOX_VALIDATING → REVIEWING）
+     * 规范：API 接口规范 V3.1 §6.6；前端 modelApi.promote() 调用此端点
+     */
+    @PostMapping("/{model_version_id}/promote")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODEL_REVIEWER', 'SCENE_EDITOR')")
+    public ApiResponse<ModelVersion> promote(
+            @PathVariable("model_version_id") String modelVersionId,
+            @AuthenticationPrincipal TianjingUserDetails user) {
+        return ApiResponse.ok(modelVersionService.submitReview(modelVersionId, user.getUsername()));
+    }
+
+    /**
      * POST /models/{id}/approve — 审核（四眼原则：审核人 ≠ 提交人）
      */
     @PostMapping("/{model_version_id}/approve")

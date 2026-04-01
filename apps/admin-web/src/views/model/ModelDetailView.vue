@@ -6,6 +6,15 @@
     >
       <template #actions>
         <el-button @click="$router.back()">返回</el-button>
+        <!-- STAGING / SANDBOX_VALIDATING：提交审核 → REVIEWING -->
+        <el-button
+          v-if="model?.status === ModelStatus.STAGING || model?.status === ModelStatus.SANDBOX_VALIDATING"
+          type="primary"
+          :loading="promoting"
+          @click="promote"
+        >
+          提交审核
+        </el-button>
         <el-tooltip
           v-if="model?.status === ModelStatus.REVIEWING && canReview && isSameUser"
           content="四眼原则：审核人不能与提交人相同"
@@ -113,6 +122,7 @@ const versionId = route.params.versionId as string
 const authStore = useAuthStore()
 const model = ref<ModelVersion | null>(null)
 const loading = ref(false)
+const promoting = ref(false)
 const canReview = computed(() => authStore.hasRole([UserRole.ADMIN, UserRole.MODEL_REVIEWER]))
 // 四眼原则：审核人不能与提交人相同
 const isSameUser = computed(
@@ -126,6 +136,22 @@ async function loadModel() {
     model.value = res.data.data
   } finally {
     loading.value = false
+  }
+}
+
+async function promote() {
+  await ElMessageBox.confirm(
+    '确认将此模型版本提交审核？提交后状态将变更为"待审核"，等待 MODEL_REVIEWER 审批。',
+    '提交审核',
+    { type: 'info', confirmButtonText: '确认提交', cancelButtonText: '取消' }
+  )
+  promoting.value = true
+  try {
+    await modelApi.promote(versionId)
+    ElMessage.success('已提交审核，等待 MODEL_REVIEWER 审批')
+    loadModel()
+  } finally {
+    promoting.value = false
   }
 }
 
