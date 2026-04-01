@@ -8,7 +8,34 @@
       </template>
     </PageHeader>
 
-    <el-row :gutter="16" v-if="session">
+    <!-- SandboxProgressPanel：小时数 / 48h 门禁进度条（S2-10 验收标准） -->
+    <el-card shadow="never" class="progress-panel" v-if="session">
+      <div class="progress-header">
+        <div class="progress-hours">
+          <span class="hours-value">{{ elapsedHours }}</span>
+          <span class="hours-unit">/ 48 小时</span>
+          <el-tag :type="gateTagType" size="small" style="margin-left: 12px">
+            {{ gateTagLabel }}
+          </el-tag>
+        </div>
+        <span class="progress-hint">Sandbox 转正门禁：连续验证 ≥ 48h（CLAUDE.md §11.3）</span>
+      </div>
+      <el-progress
+        :percentage="progressPercent"
+        :stroke-width="14"
+        :status="progressStatus"
+        :striped="session.status === 'running'"
+        :striped-flow="session.status === 'running'"
+        :duration="10"
+      />
+      <div class="progress-footer">
+        <span>开始：{{ formatDateTime(session.startTime) }}</span>
+        <span v-if="session.endTime">结束：{{ formatDateTime(session.endTime) }}</span>
+        <span v-else-if="session.status === 'running'" class="running-tip">运行中（每分钟自动刷新）</span>
+      </div>
+    </el-card>
+
+    <el-row :gutter="16" v-if="session" style="margin-top: 16px">
       <el-col :md="12">
         <el-card shadow="never">
           <template #header><span class="card-title">基本信息</span></template>
@@ -43,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -53,16 +80,68 @@ import { sandboxApi } from '@/api/sandbox'
 import { formatDateTime, formatPercent } from '@/utils/format'
 import type { SandboxSession } from '@/types'
 
+// Sandbox 转正门禁：连续验证 ≥ 48h（CLAUDE.md §11.3）
+const GATE_HOURS = 48
+
 const route = useRoute()
 const sessionId = route.params.sessionId as string
 const session = ref<SandboxSession | null>(null)
 const loading = ref(false)
+// 当前时间，running 状态下每分钟更新，驱动 elapsedHours 重新计算
+const now = ref(Date.now())
+let ticker: ReturnType<typeof setInterval> | null = null
+
+/** 已运行小时数（整数，最大 48） */
+const elapsedHours = computed(() => {
+  if (!session.value) return 0
+  const start = new Date(session.value.startTime).getTime()
+  const end = session.value.endTime
+    ? new Date(session.value.endTime).getTime()
+    : now.value
+  return Math.min(Math.floor((end - start) / 3_600_000), GATE_HOURS)
+})
+
+/** 门禁进度百分比（0-100） */
+const progressPercent = computed(() =>
+  Math.min(Math.round((elapsedHours.value / GATE_HOURS) * 100), 100)
+)
+
+/** el-progress status 属性 */
+const progressStatus = computed(() => {
+  if (!session.value) return undefined
+  if (session.value.status === 'failed') return 'exception'
+  if (progressPercent.value >= 100) return 'success'
+  return undefined
+})
+
+/** 门禁标签文案与颜色 */
+const gateTagType = computed(() => {
+  if (!session.value) return 'info'
+  if (session.value.status === 'failed') return 'danger'
+  if (progressPercent.value >= 100) return 'success'
+  if (session.value.status === 'running') return 'warning'
+  return 'info'
+})
+
+const gateTagLabel = computed(() => {
+  if (!session.value) return ''
+  if (session.value.status === 'failed') return '验证失败'
+  if (progressPercent.value >= 100) return '门禁已达标 ✓'
+  if (session.value.status === 'running') return '验证中'
+  return '已停止'
+})
 
 async function loadSession() {
   loading.value = true
   try {
     const res = await sandboxApi.getSession(sessionId)
     session.value = res.data.data
+    // running 状态启动定时器，否则清除
+    if (session.value?.status === 'running') {
+      if (!ticker) ticker = setInterval(() => { now.value = Date.now() }, 60_000)
+    } else {
+      clearTicker()
+    }
   } finally {
     loading.value = false
   }
@@ -74,10 +153,53 @@ async function stopSession() {
   loadSession()
 }
 
+function clearTicker() {
+  if (ticker) { clearInterval(ticker); ticker = null }
+}
+
 onMounted(loadSession)
+onUnmounted(clearTicker)
 </script>
 
 <style scoped lang="scss">
+.progress-panel {
+  margin-bottom: 0;
+}
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.progress-hours {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.hours-value {
+  font-size: 36px;
+  font-weight: 700;
+  color: #1890ff;
+  line-height: 1;
+}
+.hours-unit {
+  font-size: 14px;
+  color: #606266;
+}
+.progress-hint {
+  font-size: 12px;
+  color: #909399;
+}
+.progress-footer {
+  display: flex;
+  gap: 24px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+.running-tip {
+  color: #e6a23c;
+}
 .metric-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
