@@ -23,3 +23,6 @@ management:
 tianjing:
   jwt:
     public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
+  preprocess:
+    dehaze-strength: ${TIANJING_PREPROCESS_DEHAZE_STRENGTH:0.6}
+    enable-clahe:    ${TIANJING_PREPROCESS_ENABLE_CLAHE:true}

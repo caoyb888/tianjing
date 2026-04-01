@@ -7,10 +7,18 @@ spring:
   kafka:
     bootstrap-servers: ${TIANJING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     consumer:
+      # 默认消费者组（@KafkaListener 可覆盖为各自 group-id）
       group-id: result-aggregate-service-prod-cg
       auto-offset-reset: latest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  # TDengine WebSocket 数据源（规范：CLAUDE.md §7.2；使用 WS 驱动，无需 native lib）
+  datasource:
+    tdengine:
+      driver-class-name: com.taosdata.jdbc.ws.WebSocketDriver
+      url: ${TIANJING_TDENGINE_URL:jdbc:TAOS-WS://tdengine:6041/tianjing_prod?timezone=UTC}
+      username: ${TIANJING_TDENGINE_USER:root}
+      password: ${TIANJING_TDENGINE_PASSWORD:taosdata}
 
 management:
   endpoints:
@@ -21,3 +29,6 @@ management:
 tianjing:
   jwt:
     public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
+  tdengine:
+    # 判定为异常的置信度阈值（高于此值写入 is_anomaly=true）
+    anomaly-confidence-threshold: ${TIANJING_TDENGINE_ANOMALY_THRESHOLD:0.8}

@@ -23,3 +23,6 @@ management:
 tianjing:
   jwt:
     public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
+  frame-extract:
+    # 默认帧采样间隔（毫秒）：200ms ≈ 5fps，可通过 Nacos 场景配置覆盖
+    default-interval-ms: ${TIANJING_FRAME_EXTRACT_INTERVAL_MS:200}
