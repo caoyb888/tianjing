@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tianzhu.tianjing.auth.domain.SysUser;
 import com.tianzhu.tianjing.auth.dto.LoginRequest;
 import com.tianzhu.tianjing.auth.dto.LoginResponse;
+import com.tianzhu.tianjing.auth.dto.UserInfoResponse;
 import com.tianzhu.tianjing.auth.repository.SysUserMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.exception.ErrorCode;
@@ -100,6 +101,23 @@ public class AuthService {
 
         String newToken = jwtTokenProvider.generateAccessToken(user.getUsername(), user.getId(), roles);
         return LoginResponse.of(newToken, jwtProperties.getAccessTokenExpireSeconds(), user);
+    }
+
+    /**
+     * 获取当前登录用户信息
+     * GET /auth/me — 从 DB 补全 displayName、email 等字段
+     */
+    public UserInfoResponse getCurrentUser(TianjingUserDetails currentUser) {
+        SysUser user = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUsername, currentUser.getUsername())
+                .eq(SysUser::getIsDeleted, 0));
+
+        if (user == null) {
+            throw BusinessException.of(ErrorCode.USER_NOT_FOUND);
+        }
+
+        List<String> roles = userMapper.selectRolesByUserId(user.getId());
+        return UserInfoResponse.of(user, roles);
     }
 
     /**

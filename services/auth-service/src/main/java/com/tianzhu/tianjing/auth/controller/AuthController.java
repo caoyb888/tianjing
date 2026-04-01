@@ -2,6 +2,7 @@ package com.tianzhu.tianjing.auth.controller;
 
 import com.tianzhu.tianjing.auth.dto.LoginRequest;
 import com.tianzhu.tianjing.auth.dto.LoginResponse;
+import com.tianzhu.tianjing.auth.dto.UserInfoResponse;
 import com.tianzhu.tianjing.auth.service.AuthService;
 import com.tianzhu.tianjing.common.response.ApiResponse;
 import com.tianzhu.tianjing.common.security.TianjingUserDetails;
@@ -31,6 +32,17 @@ public class AuthController {
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
         return ApiResponse.ok(response);
+    }
+
+    /**
+     * GET /auth/me — 获取当前登录用户信息
+     * 规范：API 接口规范 V3.1 §6.1
+     */
+    @GetMapping("/me")
+    public ApiResponse<UserInfoResponse> me(
+            @AuthenticationPrincipal TianjingUserDetails currentUser) {
+        UserInfoResponse userInfo = authService.getCurrentUser(currentUser);
+        return ApiResponse.ok(userInfo);
     }
 
     /**
