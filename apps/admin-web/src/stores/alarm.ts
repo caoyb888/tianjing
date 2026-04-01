@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { AlarmRecord } from '@/types'
+import { useAuthStore } from '@/stores/auth'
 
 export const useAlarmStore = defineStore('alarm', () => {
   // 实时告警队列（最多缓存 50 条）
@@ -29,7 +30,10 @@ export const useAlarmStore = defineStore('alarm', () => {
 
   function startSSE() {
     if (eventSource) return
-    const token = localStorage.getItem('_tj_access_token')
+    // 安全规范 S2-01：Token 只存内存，从 authStore 读取，禁止从 localStorage 读取
+    // EventSource 不支持自定义 Header，通过 URL 参数传递（后端仅在 SSE 端点接受此方式）
+    const token = useAuthStore().accessToken
+    if (!token) return
     eventSource = new EventSource(`/api/v1/dashboard/alarms/realtime?token=${token}`)
     eventSource.onopen = () => {
       connected.value = true
@@ -42,7 +46,9 @@ export const useAlarmStore = defineStore('alarm', () => {
     }
     eventSource.onerror = () => {
       connected.value = false
-      // 5 秒后重连
+      // 清空引用，确保 5 秒后重连时 startSSE 能正常建立新连接
+      eventSource?.close()
+      eventSource = null
       setTimeout(startSSE, 5000)
     }
   }
