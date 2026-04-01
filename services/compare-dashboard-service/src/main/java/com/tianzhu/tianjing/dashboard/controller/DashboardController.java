@@ -74,7 +74,7 @@ public class DashboardController {
     /**
      * GET /dashboard/inference/trend — 推理统计趋势（近 7 天）
      */
-    @GetMapping("/inference/trend")
+    @GetMapping("/inference-trend")
     public ApiResponse<Map<String, Object>> inferenceTrend(
             @RequestParam(defaultValue = "7") int days,
             @RequestParam(required = false) String scene_id) {

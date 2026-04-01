@@ -1,7 +1,7 @@
 # CLAUDE.md — 天柱·天镜 工业视觉 AI 推理平台
 ## 项目开发行为规范
 
-> **版本**：V1.0 · **日期**：2026-03-30
+> **版本**：V1.1 · **日期**：2026-04-01
 > **适用范围**：本规范约束所有参与本项目开发的 AI 辅助编码行为（Claude Code 及同类工具），
 > 所有代码生成、重构、调试均须严格遵守本文件中的技术选型、架构约束与安全边界。
 
@@ -1039,6 +1039,12 @@ tianjing_model_retrain_trigger_total{scene_id}         # Counter
    - 8080：禁止使用，由开发服务器其他 Docker 服务占用
    - 8088：禁止使用，由开发服务器其他 Docker 服务占用
    - 如需新增服务端口，从 8102 起续编，并在 docs/天柱天镜_端口分配表_V1.0.md 中登记
+9. 微服务在本地开发环境手动以 java -jar 启动（必须通过 scripts/start-backend.sh）
+   - 手动启动会丢失 TIANJING_JWT_PUBLIC_KEY_PEM 等关键环境变量，导致所有接口返回 401/500
+   - start-backend.sh 是本地开发环境唯一认可的服务启动入口
+10. Controller 直接返回 @Entity / @TableName 实体类作为 API 响应
+    - 实体字段名（camelCase）、枚举大小写、JSONB 原始字符串极易与前端约定不一致
+    - 所有接口响应必须经过专用 DTO 转换，参考 SceneConfigDetail、AlgorithmPluginDetail
 ```
 
 ### P2 — 工程规范（Code Review 必须修复）
@@ -1052,6 +1058,12 @@ tianjing_model_retrain_trigger_total{scene_id}         # Counter
 6. TDengine 时序数据遗漏 is_sandbox 标签
 7. 新增算法插件未提供 plugin.yaml 元信息文件
 8. MinIO 新增 Bucket 未配置访问策略
+9. 前端 AppLayout.vue 的 <router-view> 使用 <transition mode="out-in"> 包装
+   - 当子页面 API 请求失败时，CSS transitionend 事件不触发，旧组件永久残留 DOM，
+     导致路由切换视觉卡死。如需页面切换动画，使用无 mode 的 <transition> 或 JS 过渡方案
+10. 新增微服务时未在 scripts/ 目录提供 seed_{module}.sql
+    - 本地开发环境必须可通过种子数据直接运行，不依赖手动造数据
+    - 种子数据文件命名规范：scripts/seed_{service_name}.sql
 ```
 
 ---
@@ -1092,7 +1104,8 @@ SCENE-STRIP-*     # 带钢厂
 
 ---
 
-*CLAUDE.md 版本：V1.0 · 编制日期：2026-03-30 · 天柱·天镜项目组*
+*CLAUDE.md 版本：V1.1 · 编制日期：2026-04-01 · 天柱·天镜项目组*
+*V1.1 变更：§15 新增 P1 规则 9-10（服务启动规范、DTO 强制规范），P2 规则 9-10（路由过渡规范、种子数据规范），源于 2026-04-01 调试实践总结*
 
 *本文件是项目唯一技术行为约束文件，与方案 V2.0 保持一致。*
 *如本文件与口头约定存在冲突，以本文件为准。*

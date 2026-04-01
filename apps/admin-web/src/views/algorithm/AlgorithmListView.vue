@@ -41,12 +41,59 @@
     </el-row>
 
     <EmptyState v-if="!loading && plugins.length === 0" description="暂无注册的算法插件" />
+
+    <!-- 注册插件对话框 -->
+    <el-dialog v-model="showRegister" title="注册算法插件" width="560px" @close="resetForm">
+      <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-width="110px">
+        <el-form-item label="插件 ID" prop="pluginId">
+          <el-input v-model="registerForm.pluginId" placeholder="例：ATOM-DETECT-YOLO-V1" />
+        </el-form-item>
+        <el-form-item label="插件名称" prop="name">
+          <el-input v-model="registerForm.name" placeholder="例：通用目标检测引擎" />
+        </el-form-item>
+        <el-form-item label="版本号" prop="version">
+          <el-input v-model="registerForm.version" placeholder="例：1.0.0" />
+        </el-form-item>
+        <el-form-item label="插件类型" prop="type">
+          <el-select v-model="registerForm.type" placeholder="请选择插件类型" style="width: 100%">
+            <el-option label="目标检测 (detection)" value="detection" />
+            <el-option label="语义分割 (segmentation)" value="segmentation" />
+            <el-option label="图像分类 (classification)" value="classification" />
+            <el-option label="尺寸测量 (measurement)" value="measurement" />
+            <el-option label="图像增强 (enhancement)" value="enhancement" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="支持场景">
+          <el-select
+            v-model="registerForm.supportedScenes"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="输入场景名称后回车"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="mAP@50">
+          <el-input-number v-model="registerForm.map50" :min="0" :max="1" :step="0.01" :precision="3" placeholder="例：0.910" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="GPU推理耗时(ms)">
+          <el-input-number v-model="registerForm.inferenceMs" :min="0" :precision="1" placeholder="例：18" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showRegister = false">取消</el-button>
+        <el-button type="primary" :loading="registering" @click="submitRegister">确认注册</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PermissionButton from '@/components/common/PermissionButton.vue'
@@ -56,6 +103,57 @@ import { UserRole, type AlgorithmPlugin } from '@/types'
 const plugins = ref<AlgorithmPlugin[]>([])
 const loading = ref(false)
 const showRegister = ref(false)
+const registering = ref(false)
+const registerFormRef = ref<FormInstance>()
+
+const registerForm = reactive({
+  pluginId: '',
+  name: '',
+  version: '',
+  type: '' as AlgorithmPlugin['type'] | '',
+  supportedScenes: [] as string[],
+  map50: undefined as number | undefined,
+  inferenceMs: undefined as number | undefined,
+})
+
+const registerRules: FormRules = {
+  pluginId: [{ required: true, message: '请输入插件 ID', trigger: 'blur' }],
+  name:     [{ required: true, message: '请输入插件名称', trigger: 'blur' }],
+  version:  [{ required: true, message: '请输入版本号', trigger: 'blur' }],
+  type:     [{ required: true, message: '请选择插件类型', trigger: 'change' }],
+}
+
+function resetForm() {
+  registerFormRef.value?.resetFields()
+  registerForm.supportedScenes = []
+  registerForm.map50 = undefined
+  registerForm.inferenceMs = undefined
+}
+
+async function submitRegister() {
+  await registerFormRef.value?.validate()
+  registering.value = true
+  try {
+    await algorithmApi.register({
+      pluginId: registerForm.pluginId,
+      name: registerForm.name,
+      version: registerForm.version,
+      type: registerForm.type,
+      supportedScenes: registerForm.supportedScenes,
+      accuracyMetrics: {
+        map50: registerForm.map50,
+        inferenceMs: registerForm.inferenceMs ?? 0,
+      },
+    })
+    ElMessage.success('插件注册成功')
+    showRegister.value = false
+    loadPlugins()
+  } catch {
+    ElMessage.error('注册失败，请稍后重试')
+  } finally {
+    registering.value = false
+  }
+}
 
 async function loadPlugins() {
   loading.value = true

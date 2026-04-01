@@ -50,11 +50,15 @@ public class SceneConfigService {
     // ==============================
 
     public PageResult<SceneConfigDetail> listScenes(int page, int size,
-                                                     String factoryCode, String category,
+                                                     String factory, String category,
                                                      String status, String priority,
                                                      String keyword) {
+        // 前端枚举值 → DB 存储值映射
+        String factoryCode = toDbFactory(factory);
+        String dbCategory  = toDbCategory(category);
+        String dbStatus    = status != null ? status.toUpperCase() : null;
         Page<SceneConfig> pageParam = new Page<>(page, size);
-        var result = sceneMapper.selectPageWithFilters(pageParam, factoryCode, category, status, priority, keyword);
+        var result = sceneMapper.selectPageWithFilters(pageParam, factoryCode, dbCategory, dbStatus, priority, keyword);
         List<SceneConfigDetail> items = result.getRecords().stream()
                 .map(SceneConfigDetail::from)
                 .toList();
@@ -303,6 +307,30 @@ public class SceneConfigService {
             // 缓存更新失败不影响主流程（路由服务有 DB 降级读取）
             log.warn("Redis 缓存更新失败 scene_id={}: {}", scene.getSceneId(), e.getMessage());
         }
+    }
+
+    /** 前端 Factory 枚举值 → DB factory_code */
+    private static String toDbFactory(String frontendValue) {
+        if (frontendValue == null) return null;
+        return switch (frontendValue.toLowerCase()) {
+            case "pellet"    -> "PELLET";
+            case "sintering" -> "SINTER";
+            case "steel"     -> "STEEL";
+            case "section"   -> "SECTION";
+            case "strip"     -> "STRIP";
+            default          -> frontendValue.toUpperCase();
+        };
+    }
+
+    /** 前端 SceneCategory 枚举值 → DB category */
+    private static String toDbCategory(String frontendValue) {
+        if (frontendValue == null) return null;
+        return switch (frontendValue.toLowerCase()) {
+            case "quality"   -> "QUALITY_INSPECT";
+            case "equipment" -> "EQUIPMENT_MONITOR";
+            case "process"   -> "PROCESS_PARAM";
+            default          -> frontendValue.toUpperCase();
+        };
     }
 
     private String generateSceneId(String factoryCode) {

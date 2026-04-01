@@ -4,14 +4,7 @@
     <div class="main-container">
       <AppHeader />
       <main class="page-content">
-        <router-view v-slot="{ Component, route }">
-          <transition name="fade" mode="out-in">
-            <keep-alive v-if="route.meta.keepAlive">
-              <component :is="Component" :key="route.fullPath" />
-            </keep-alive>
-            <component v-else :is="Component" :key="route.fullPath" />
-          </transition>
-        </router-view>
+        <router-view />
       </main>
       <AppFooter />
     </div>

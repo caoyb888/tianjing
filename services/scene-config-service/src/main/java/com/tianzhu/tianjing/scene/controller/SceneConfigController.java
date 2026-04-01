@@ -33,13 +33,13 @@ public class SceneConfigController {
     public ApiResponse<PageResult<SceneConfigDetail>> listScenes(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String factory_code,
+            @RequestParam(required = false) String factory,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String keyword) {
 
-        return ApiResponse.page(sceneService.listScenes(page, size, factory_code, category, status, priority, keyword));
+        return ApiResponse.page(sceneService.listScenes(page, size, factory, category, status, priority, keyword));
     }
 
     /**

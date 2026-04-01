@@ -3,6 +3,7 @@ package com.tianzhu.tianjing.algomodel.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tianzhu.tianjing.algomodel.domain.AlgorithmPlugin;
+import com.tianzhu.tianjing.algomodel.dto.AlgorithmPluginDetail;
 import com.tianzhu.tianjing.algomodel.repository.AlgorithmPluginMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.exception.ErrorCode;
@@ -21,21 +22,24 @@ import java.util.List;
 public class AlgorithmPluginService {
     private final AlgorithmPluginMapper pluginMapper;
 
-    public PageResult<AlgorithmPlugin> listPlugins(int page, int size, String pluginType, String status) {
+    public PageResult<AlgorithmPluginDetail> listPlugins(int page, int size, String pluginType, String status) {
         Page<AlgorithmPlugin> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<AlgorithmPlugin> wrapper = new LambdaQueryWrapper<AlgorithmPlugin>()
-                .eq(pluginType != null, AlgorithmPlugin::getPluginType, pluginType)
+                .eq(pluginType != null, AlgorithmPlugin::getPluginType, pluginType != null ? pluginType.toUpperCase() : null)
                 .eq(status != null, AlgorithmPlugin::getStatus, status)
                 .orderByDesc(AlgorithmPlugin::getCreatedAt);
         var result = pluginMapper.selectPage(pageParam, wrapper);
-        return PageResult.of(result.getTotal(), page, size, result.getRecords());
+        List<AlgorithmPluginDetail> items = result.getRecords().stream()
+                .map(AlgorithmPluginDetail::from)
+                .toList();
+        return PageResult.of(result.getTotal(), page, size, items);
     }
 
-    public AlgorithmPlugin getPlugin(String pluginId) {
+    public AlgorithmPluginDetail getPlugin(String pluginId) {
         AlgorithmPlugin plugin = pluginMapper.selectOne(new LambdaQueryWrapper<AlgorithmPlugin>()
                 .eq(AlgorithmPlugin::getPluginId, pluginId));
         if (plugin == null) throw BusinessException.notFound(ErrorCode.ALGO_PLUGIN_NOT_FOUND);
-        return plugin;
+        return AlgorithmPluginDetail.from(plugin);
     }
 
     @Transactional

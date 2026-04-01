@@ -67,7 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(auth);
 
-            } catch (JwtException e) {
+            } catch (JwtException | IllegalStateException e) {
                 log.debug("JWT 验证失败: {}", e.getMessage());
                 // 继续过滤链，让 Spring Security 的 AuthenticationEntryPoint 处理 401
             }

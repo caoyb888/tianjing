@@ -27,14 +27,16 @@ public class SceneConfig {
     private String status;
 
     private String boundDeviceCode;
+    @TableField("prod_model_id")
     private String activeModelVersionId;
     private String activePluginId;
     private Integer frameInterval;
 
-    /** 告警配置（JSONB 存储）*/
+    /** 告警配置（JSONB 存储，对应列 alarm_config_json）*/
     private String alarmConfigJson;
 
-    /** 算法参数扩展（JSONB 存储）*/
+    /** 算法参数扩展（JSONB 存储，对应列 algo_config_json）*/
+    @TableField("algo_config_json")
     private String algoParamsJson;
 
     /** 乐观锁版本号 */

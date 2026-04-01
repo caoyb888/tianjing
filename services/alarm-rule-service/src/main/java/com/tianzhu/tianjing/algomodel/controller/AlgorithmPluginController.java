@@ -1,6 +1,7 @@
 package com.tianzhu.tianjing.algomodel.controller;
 
 import com.tianzhu.tianjing.algomodel.domain.AlgorithmPlugin;
+import com.tianzhu.tianjing.algomodel.dto.AlgorithmPluginDetail;
 import com.tianzhu.tianjing.algomodel.service.AlgorithmPluginService;
 import com.tianzhu.tianjing.common.response.ApiResponse;
 import com.tianzhu.tianjing.common.response.PageResult;
@@ -24,7 +25,7 @@ public class AlgorithmPluginController {
     private final AlgorithmPluginService pluginService;
 
     @GetMapping
-    public ApiResponse<PageResult<AlgorithmPlugin>> listPlugins(
+    public ApiResponse<PageResult<AlgorithmPluginDetail>> listPlugins(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String plugin_type,
@@ -33,7 +34,7 @@ public class AlgorithmPluginController {
     }
 
     @GetMapping("/{plugin_id}")
-    public ApiResponse<AlgorithmPlugin> getPlugin(@PathVariable("plugin_id") String pluginId) {
+    public ApiResponse<AlgorithmPluginDetail> getPlugin(@PathVariable("plugin_id") String pluginId) {
         return ApiResponse.ok(pluginService.getPlugin(pluginId));
     }
 
