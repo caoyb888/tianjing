@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 import type { ApiResponse } from '@/types'
+import { tokenHolder } from '@/utils/tokenHolder'
 
 NProgress.configure({ showSpinner: false })
 
@@ -24,15 +25,11 @@ const request = axios.create({
 request.interceptors.request.use(
   (config) => {
     NProgress.start()
-    // Token 从 authStore 获取（内存存储，禁止 localStorage）
-    // 动态导入避免循环依赖
-    try {
-      const { useAuthStore } = require('@/stores/auth')
-      const authStore = useAuthStore()
-      if (authStore.accessToken) {
-        config.headers.Authorization = `Bearer ${authStore.accessToken}`
-      }
-    } catch {}
+    // Token 从 tokenHolder 获取（内存存储，禁止 localStorage）
+    const token = tokenHolder.get()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     // 每个请求注入 trace_id
     config.headers['X-Trace-Id'] = generateTraceId()
     return config
@@ -57,22 +54,8 @@ request.interceptors.response.use(
   async (error) => {
     NProgress.done()
     if (error.response?.status === 401) {
-      // Token 过期，尝试静默刷新
-      try {
-        const { useAuthStore } = require('@/stores/auth')
-        const authStore = useAuthStore()
-        if (authStore.refreshToken) {
-          const res = await axios.post('/api/v1/auth/refresh', {
-            refresh_token: authStore.refreshToken,
-          })
-          if (res.data.code === 0) {
-            authStore.setTokens(res.data.data.access_token, res.data.data.refresh_token)
-            error.config.headers.Authorization = `Bearer ${res.data.data.access_token}`
-            return request(error.config)
-          }
-        }
-        authStore.clearTokens()
-      } catch {}
+      // Token 过期，清除后跳转登录页
+      tokenHolder.clear()
       window.location.href = '/login'
     } else if (error.response?.status === 403) {
       ElMessage.error('权限不足')
