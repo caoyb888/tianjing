@@ -8,11 +8,14 @@ import com.tianzhu.tianjing.common.response.PageResult;
 import com.tianzhu.tianjing.replay.domain.SimulationTask;
 import com.tianzhu.tianjing.replay.dto.SimulationCreateRequest;
 import com.tianzhu.tianjing.replay.repository.SimulationTaskMapper;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
@@ -22,7 +25,7 @@ import java.util.UUID;
 /**
  * 离线仿真业务服务
  * 规范：API 接口规范 V3.1 §6.9（5 个接口）
- * MinIO 预签名 URL 生成（1h 有效）
+ * 视频文件 multipart 上传至 MinIO tianjing-sim-temp bucket
  * 视频文件 72h 过期返回 2009
  * 仿真告警不触发外部推送（Sandbox 拦截器保证）
  */
@@ -32,6 +35,7 @@ import java.util.UUID;
 public class SimulationService {
 
     private final SimulationTaskMapper taskMapper;
+    private final MinioClient minioClient;
 
     @Value("${tianjing.minio.endpoint:http://localhost:9000}")
     private String minioEndpoint;
@@ -57,28 +61,50 @@ public class SimulationService {
         return task;
     }
 
-    @Transactional
-    public Map<String, Object> getUploadUrl(String sceneId, String fileName, String operator) {
-        // 生成 MinIO 预签名上传 URL（1h 有效）
-        // 实际生成逻辑需注入 MinIO Client；此处返回构造路径
-        String objectPath = "simulation/" + sceneId + "/" + UUID.randomUUID() + "/" + fileName;
-        String presignedUrl = minioEndpoint + "/" + simBucket + "/" + objectPath + "?presigned=1h";
+    /**
+     * 上传仿真视频到 MinIO（POST /simulations/upload-video）
+     * 文件存储路径：simulation/{sceneId}/{uuid}/{filename}
+     *
+     * @return { url, object_path }
+     */
+    public Map<String, String> uploadVideo(MultipartFile file, String sceneId) {
+        String originalName = file.getOriginalFilename() != null
+                ? file.getOriginalFilename() : "video.mp4";
+        String objectPath = "simulation/" + sceneId + "/" + UUID.randomUUID() + "/" + originalName;
 
-        return Map.of(
-                "upload_url", presignedUrl,
-                "object_path", objectPath,
-                "expires_in_seconds", 3600,
-                "max_size_mb", 2048
-        );
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(simBucket)
+                    .object(objectPath)
+                    .stream(file.getInputStream(), file.getSize(), -1)
+                    .contentType(file.getContentType() != null ? file.getContentType() : "video/mp4")
+                    .build());
+        } catch (Exception e) {
+            log.error("视频上传 MinIO 失败 object={}", objectPath, e);
+            throw BusinessException.of(ErrorCode.INTERNAL_SERVER_ERROR, "视频上传失败：" + e.getMessage());
+        }
+
+        String url = minioEndpoint + "/" + simBucket + "/" + objectPath;
+        log.info("视频上传成功 scene_id={} url={}", sceneId, url);
+        return Map.of("url", url, "object_path", objectPath);
     }
 
+    /**
+     * 创建仿真任务（POST /simulations）
+     * 前端先上传视频，再携带 scene_id + video_url 调用此接口
+     */
     @Transactional
     public SimulationTask createTask(SimulationCreateRequest request, String operator) {
+        // 从 video_url 中提取文件名和对象路径
+        String videoUrl = request.videoUrl();
+        String objectPath = extractObjectPath(videoUrl);
+        String fileName = objectPath.substring(objectPath.lastIndexOf('/') + 1);
+
         SimulationTask task = new SimulationTask();
         task.setTaskId("SIM-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
         task.setSceneId(request.sceneId());
-        task.setVideoFileName(request.videoFileName());
-        task.setVideoObjectPath(request.videoObjectPath());
+        task.setVideoFileName(fileName);
+        task.setVideoObjectPath(objectPath);
         task.setStatus("PENDING");
         task.setProgressPercent(0);
         task.setUploadedAt(OffsetDateTime.now());
@@ -90,7 +116,6 @@ public class SimulationService {
 
     public SimulationTask getTaskProgress(String taskId) {
         SimulationTask task = getTask(taskId);
-        // 校验 72h 有效期
         if (task.getUploadedAt() != null) {
             long hoursElapsed = ChronoUnit.HOURS.between(task.getUploadedAt(), OffsetDateTime.now());
             if (hoursElapsed >= 72) {
@@ -110,5 +135,15 @@ public class SimulationService {
         task.setStatus("FAILED");
         taskMapper.updateById(task);
         log.info("取消仿真任务 task_id={} operator={}", taskId, operator);
+    }
+
+    /** 从完整 URL 中提取 MinIO 对象路径（bucket 名之后的部分） */
+    private String extractObjectPath(String url) {
+        // url 格式: http://minio:9000/tianjing-sim-temp/simulation/...
+        int bucketIdx = url.indexOf(simBucket);
+        if (bucketIdx >= 0) {
+            return url.substring(bucketIdx + simBucket.length() + 1);
+        }
+        return url; // fallback
     }
 }

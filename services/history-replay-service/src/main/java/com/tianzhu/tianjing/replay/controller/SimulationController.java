@@ -9,23 +9,31 @@ import com.tianzhu.tianjing.replay.service.SimulationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
 /**
  * 离线仿真接口
  * 规范：API 接口规范 V3.1 §6.9（5 个端点）
+ *
+ * 路径对齐说明（修复 BLK-02）：
+ *   原路径 /api/v1/simulation（单数）→ /api/v1/simulations（复数，匹配前端）
+ *   原路径 /simulation/upload-url（预签名 URL）→ /simulations/upload-video（multipart 直传，匹配前端）
+ *   原路径 /simulation/tasks/**（带 /tasks 子路径）→ /simulations/**（直接挂载，匹配前端）
  */
 @RestController
-@RequestMapping("/api/v1/simulation")
+@RequestMapping("/api/v1/simulations")
 @RequiredArgsConstructor
 public class SimulationController {
 
     private final SimulationService simulationService;
 
-    @GetMapping("/tasks")
+    /** GET /simulations — 仿真任务列表 */
+    @GetMapping
     public ApiResponse<PageResult<SimulationTask>> listTasks(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -33,17 +41,27 @@ public class SimulationController {
         return ApiResponse.page(simulationService.listTasks(page, size, scene_id));
     }
 
-    /** GET /simulation/upload-url — 获取 MinIO 预签名上传 URL（1h 有效） */
-    @GetMapping("/upload-url")
-    public ApiResponse<Map<String, Object>> getUploadUrl(
-            @RequestParam String scene_id,
-            @RequestParam String file_name,
-            @AuthenticationPrincipal TianjingUserDetails user) {
-        return ApiResponse.ok(simulationService.getUploadUrl(scene_id, file_name, user.getUsername()));
+    /** GET /simulations/{task_id} — 查询仿真任务详情/进度 */
+    @GetMapping("/{task_id}")
+    public ApiResponse<SimulationTask> getTask(
+            @PathVariable("task_id") String taskId) {
+        return ApiResponse.ok(simulationService.getTaskProgress(taskId));
     }
 
-    /** POST /simulation/tasks — 创建仿真任务（视频已上传 MinIO 后调用） */
-    @PostMapping("/tasks")
+    /**
+     * POST /simulations/upload-video — 上传仿真视频（multipart）
+     * 响应：{ url: "http://minio:9000/tianjing-sim-temp/...", object_path: "..." }
+     */
+    @PostMapping(value = "/upload-video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<Map<String, String>> uploadVideo(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam("scene_id") String sceneId,
+            @AuthenticationPrincipal TianjingUserDetails user) {
+        return ApiResponse.ok(simulationService.uploadVideo(file, sceneId));
+    }
+
+    /** POST /simulations — 创建仿真任务（视频已上传后调用） */
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<SimulationTask> createTask(
             @Valid @RequestBody SimulationCreateRequest request,
@@ -51,15 +69,8 @@ public class SimulationController {
         return ApiResponse.ok(simulationService.createTask(request, user.getUsername()));
     }
 
-    /** GET /simulation/tasks/{task_id} — 查询仿真进度 */
-    @GetMapping("/tasks/{task_id}")
-    public ApiResponse<SimulationTask> getProgress(
-            @PathVariable("task_id") String taskId) {
-        return ApiResponse.ok(simulationService.getTaskProgress(taskId));
-    }
-
-    /** POST /simulation/tasks/{task_id}/cancel — 取消仿真任务（接口 #43） */
-    @PostMapping("/tasks/{task_id}/cancel")
+    /** POST /simulations/{task_id}/cancel — 取消仿真任务 */
+    @PostMapping("/{task_id}/cancel")
     public ApiResponse<Void> cancelTask(
             @PathVariable("task_id") String taskId,
             @AuthenticationPrincipal TianjingUserDetails user) {

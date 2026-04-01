@@ -10,13 +10,16 @@ export const simulationApi = {
 
   get: (taskId: string) => request.get(`/simulations/${taskId}`),
 
-  create: (data: Record<string, unknown>) => request.post('/simulations', data),
+  // 发送 snake_case 键名匹配后端 SimulationCreateRequest（scene_id / video_url）
+  create: (data: { sceneId: string; videoUrl: string }) =>
+    request.post('/simulations', { scene_id: data.sceneId, video_url: data.videoUrl }),
 
   cancel: (taskId: string) => request.post(`/simulations/${taskId}/cancel`),
 
-  uploadVideo: (file: File, onProgress?: (percent: number) => void) => {
+  uploadVideo: (file: File, sceneId: string, onProgress?: (percent: number) => void) => {
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('scene_id', sceneId)
     return request.post('/simulations/upload-video', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {

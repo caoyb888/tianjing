@@ -18,6 +18,12 @@
         <dependency><groupId>com.baomidou</groupId><artifactId>mybatis-plus-spring-boot3-starter</artifactId></dependency>
         <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
+        <!-- MinIO Java SDK：视频文件上传至对象存储 -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.9</version>
+        </dependency>
     </dependencies>
     <build><plugins>
         <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>

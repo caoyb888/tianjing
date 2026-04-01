@@ -100,7 +100,7 @@ async function loadTasks() {
 async function handleVideoUpload(file: File) {
   uploadProgress.value = 0
   try {
-    const res = await simulationApi.uploadVideo(file, (p) => { uploadProgress.value = p })
+    const res = await simulationApi.uploadVideo(file, createForm.sceneId, (p) => { uploadProgress.value = p })
     uploadedVideoUrl.value = res.data.data.url
     createForm.videoUrl = res.data.data.url
     ElMessage.success('视频上传成功')
