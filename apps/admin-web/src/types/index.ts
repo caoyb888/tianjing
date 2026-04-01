@@ -53,14 +53,15 @@ export enum Factory {
   STRIP = 'strip',         // 带钢厂
 }
 
-// 模型状态
+// 模型状态（与后端 ModelVersion.status 严格对齐）
+// 状态机：STAGING → SANDBOX_VALIDATING → REVIEWING → PRODUCTION → DEPRECATED
+// 审核拒绝：REVIEWING → STAGING（回退）；蓝绿切换：PRODUCTION → DEPRECATED
 export enum ModelStatus {
-  PENDING_REVIEW = 'pending_review',
-  SANDBOX_TESTING = 'sandbox_testing',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  PRODUCTION = 'production',
-  DEPRECATED = 'deprecated',
+  STAGING            = 'STAGING',
+  SANDBOX_VALIDATING = 'SANDBOX_VALIDATING',
+  REVIEWING          = 'REVIEWING',
+  PRODUCTION         = 'PRODUCTION',
+  DEPRECATED         = 'DEPRECATED',
 }
 
 // 告警场景配置类型

@@ -7,39 +7,32 @@
       <template #actions>
         <el-button @click="$router.back()">返回</el-button>
         <el-tooltip
-          v-if="model?.status === 'pending_review' && canReview && isSameUser"
+          v-if="model?.status === ModelStatus.REVIEWING && canReview && isSameUser"
           content="四眼原则：审核人不能与提交人相同"
           placement="top"
         >
           <el-button type="success" disabled>审批通过</el-button>
         </el-tooltip>
         <el-button
-          v-if="model?.status === 'pending_review' && canReview && !isSameUser"
+          v-if="model?.status === ModelStatus.REVIEWING && canReview && !isSameUser"
           type="success"
           @click="approve(true)"
         >
           审批通过
         </el-button>
         <el-tooltip
-          v-if="model?.status === 'pending_review' && canReview && isSameUser"
+          v-if="model?.status === ModelStatus.REVIEWING && canReview && isSameUser"
           content="四眼原则：审核人不能与提交人相同"
           placement="top"
         >
           <el-button type="danger" disabled>审批拒绝</el-button>
         </el-tooltip>
         <el-button
-          v-if="model?.status === 'pending_review' && canReview && !isSameUser"
+          v-if="model?.status === ModelStatus.REVIEWING && canReview && !isSameUser"
           type="danger"
           @click="approve(false)"
         >
           审批拒绝
-        </el-button>
-        <el-button
-          v-if="model?.status === 'approved' && canReview"
-          type="primary"
-          @click="promoteToProduction"
-        >
-          发布至生产
         </el-button>
       </template>
     </PageHeader>
@@ -76,7 +69,7 @@
             审核人与提交人相同时，系统返回错误码 4004。
           </el-alert>
           <el-alert
-            v-if="isSameUser && model?.status === 'pending_review'"
+            v-if="isSameUser && model?.status === ModelStatus.REVIEWING"
             type="warning"
             :closable="false"
             show-icon
@@ -146,17 +139,6 @@ async function approve(approved: boolean) {
   if (comment === null) return
   await modelApi.approve(versionId, { approved, comment })
   ElMessage.success(`审批已${label}`)
-  loadModel()
-}
-
-async function promoteToProduction() {
-  await ElMessageBox.confirm(
-    '确定将此模型发布至生产环境吗？发布前请确认已通过 Sandbox 验证。',
-    '确认发布',
-    { type: 'warning' }
-  )
-  await modelApi.promote(versionId)
-  ElMessage.success('发布成功')
   loadModel()
 }
 

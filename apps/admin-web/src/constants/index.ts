@@ -35,14 +35,13 @@ export const SCENE_CATEGORY_CONFIG = {
   [SceneCategory.PROCESS]: { label: '工艺参数', icon: 'Setting' },
 }
 
-// 模型状态配置
+// 模型状态配置（与后端 ModelVersion.status 对齐）
 export const MODEL_STATUS_CONFIG = {
-  [ModelStatus.PENDING_REVIEW]: { label: '待审核', type: 'info' as const },
-  [ModelStatus.SANDBOX_TESTING]: { label: 'Sandbox 测试中', type: 'warning' as const },
-  [ModelStatus.APPROVED]: { label: '已通过', type: 'success' as const },
-  [ModelStatus.REJECTED]: { label: '已拒绝', type: 'danger' as const },
-  [ModelStatus.PRODUCTION]: { label: '生产中', type: 'success' as const },
-  [ModelStatus.DEPRECATED]: { label: '已废弃', type: 'info' as const },
+  [ModelStatus.STAGING]:            { label: '已注册',      type: 'info' as const },
+  [ModelStatus.SANDBOX_VALIDATING]: { label: 'Sandbox 验证中', type: 'warning' as const },
+  [ModelStatus.REVIEWING]:          { label: '待审核',      type: 'warning' as const },
+  [ModelStatus.PRODUCTION]:         { label: '已上线',      type: 'success' as const },
+  [ModelStatus.DEPRECATED]:         { label: '已废弃',      type: 'info' as const },
 }
 
 // 角色配置

@@ -30,7 +30,7 @@
         <template #default="{ row }">
           <el-button link size="small" @click="$router.push(`/models/${row.versionId}`)">详情</el-button>
           <el-button
-            v-if="row.status === 'pending_review' && canReview"
+            v-if="row.status === ModelStatus.REVIEWING && canReview"
             link size="small" type="success"
             @click="reviewModel(row.versionId, true)"
           >
