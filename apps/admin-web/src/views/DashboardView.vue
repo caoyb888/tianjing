@@ -61,7 +61,7 @@
         </div>
       </template>
 
-      <el-table :data="alarmStore.realtimeAlarms" size="small" max-height="300">
+      <el-table :data="alarmStore.realtimeAlarms" size="small" max-height="300" :row-class-name="alarmRowClass">
         <el-table-column label="级别" width="80">
           <template #default="{ row }">
             <StatusBadge :status="row.alarmLevel" :map="alarmLevelMap" />
@@ -105,6 +105,10 @@ const loading = ref(false)
 const overview = ref<Record<string, number>>({})
 const trendData = ref<unknown[]>([])
 const trendScene = ref('')
+
+function alarmRowClass({ row }: { row: { alarmLevel: AlarmLevel } }) {
+  return row.alarmLevel === AlarmLevel.CRITICAL ? 'alarm-row-critical' : ''
+}
 
 const alarmLevelMap = {
   [AlarmLevel.CRITICAL]: { label: '严重', type: 'danger' as const },
@@ -235,5 +239,15 @@ onMounted(loadData)
   :deep(.el-card__body) {
     padding: 0;
   }
+}
+
+/* S2-12：CRITICAL 告警行 3 秒闪烁提示 */
+@keyframes alarm-flash {
+  0%, 100% { background-color: transparent; }
+  50%       { background-color: rgba(245, 108, 108, 0.18); }
+}
+
+:deep(.alarm-row-critical) {
+  animation: alarm-flash 1s ease-in-out 3;
 }
 </style>
