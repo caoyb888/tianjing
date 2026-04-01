@@ -13,12 +13,12 @@ public interface SceneConfigMapper extends BaseMapper<SceneConfig> {
 
     @Select("""
         SELECT s.* FROM scene_config s
-        WHERE s.is_deleted = 0
-          AND (#{factoryCode} IS NULL OR s.factory_code = #{factoryCode})
-          AND (#{category} IS NULL OR s.category = #{category})
-          AND (#{status} IS NULL OR s.status = #{status})
-          AND (#{priority} IS NULL OR s.priority = #{priority})
-          AND (#{keyword} IS NULL OR s.scene_name LIKE CONCAT('%', #{keyword}, '%'))
+        WHERE s.is_deleted = false
+          AND (#{factoryCode,jdbcType=VARCHAR} IS NULL OR s.factory_code = #{factoryCode,jdbcType=VARCHAR})
+          AND (#{category,jdbcType=VARCHAR} IS NULL OR s.category = #{category,jdbcType=VARCHAR})
+          AND (#{status,jdbcType=VARCHAR} IS NULL OR s.status = #{status,jdbcType=VARCHAR})
+          AND (#{priority,jdbcType=VARCHAR} IS NULL OR s.priority = #{priority,jdbcType=VARCHAR})
+          AND (#{keyword,jdbcType=VARCHAR} IS NULL OR s.scene_name LIKE CONCAT('%', #{keyword,jdbcType=VARCHAR}, '%'))
         ORDER BY s.created_at DESC
         """)
     IPage<SceneConfig> selectPageWithFilters(
