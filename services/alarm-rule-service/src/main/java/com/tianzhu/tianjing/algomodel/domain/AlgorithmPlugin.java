@@ -16,9 +16,11 @@ public class AlgorithmPlugin {
     private String version;
     private String pluginType;
     private String backbone;
-    private String supportedScenes;
-    private String hardwareRequirementsJson;
-    private String accuracyMetricsJson;
+    // DB 中以 metadata_json 存储，以下字段在实体层不映射
+    @TableField(exist = false) private String supportedScenes;
+    @TableField(exist = false) private String hardwareRequirementsJson;
+    @TableField(exist = false) private String accuracyMetricsJson;
+    private String metadataJson;
     private String uiSchemaJson;
     private String inferBackend;
     private String status;
