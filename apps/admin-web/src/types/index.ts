@@ -108,7 +108,7 @@ export interface AlarmRecord {
   imageUrl: string
   timestamp: string
   isSandbox: boolean
-  feedbackStatus?: 'pending' | 'confirmed' | 'rejected'
+  feedbackStatus?: 'pending' | 'TRUE_POSITIVE' | 'FALSE_POSITIVE' | 'FALSE_NEGATIVE'
   detections?: AlarmDetection[]
 }
 

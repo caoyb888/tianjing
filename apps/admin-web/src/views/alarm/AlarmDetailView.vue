@@ -58,9 +58,10 @@
     <el-dialog v-model="showFeedback" title="提交处置结果" width="480px">
       <el-form :model="feedbackForm" label-width="100px">
         <el-form-item label="处置结果" required>
-          <el-radio-group v-model="feedbackForm.feedback_type">
-            <el-radio value="confirm">确认告警（真阳性）</el-radio>
-            <el-radio value="reject">驳回告警（误报）</el-radio>
+          <el-radio-group v-model="feedbackForm.feedback_type" style="display: flex; flex-direction: column; gap: 8px">
+            <el-radio value="TRUE_POSITIVE">真阳性（确认告警，现场确有异常）</el-radio>
+            <el-radio value="FALSE_POSITIVE">假阳性（误报，现场无异常）</el-radio>
+            <el-radio value="FALSE_NEGATIVE">假阴性（漏报，现场有异常但模型未检出）</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="处置说明">
@@ -107,14 +108,15 @@ const flatDetections = computed(() =>
 )
 
 const feedbackForm = reactive({
-  feedback_type: 'confirm' as 'confirm' | 'reject',
+  feedback_type: 'TRUE_POSITIVE' as 'TRUE_POSITIVE' | 'FALSE_POSITIVE' | 'FALSE_NEGATIVE',
   comment: '',
 })
 
 const feedbackStatusMap = {
-  pending: { label: '待处置', type: 'info' as const },
-  confirmed: { label: '已确认', type: 'success' as const },
-  rejected: { label: '已驳回', type: 'warning' as const },
+  pending:        { label: '待处置', type: 'info' as const },
+  TRUE_POSITIVE:  { label: '已确认（TP）', type: 'success' as const },
+  FALSE_POSITIVE: { label: '误报（FP）', type: 'warning' as const },
+  FALSE_NEGATIVE: { label: '漏报（FN）', type: 'danger' as const },
 }
 
 function levelType(level: AlarmLevel) {

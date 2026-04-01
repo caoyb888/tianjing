@@ -86,7 +86,7 @@ class AlarmServiceSandboxTest {
         when(alarmMapper.selectOne(any())).thenReturn(sandboxAlarm);
         when(alarmMapper.updateById(any())).thenReturn(1);
 
-        AlarmFeedbackRequest feedbackRequest = new AlarmFeedbackRequest(true, "误报，现场无异常");
+        AlarmFeedbackRequest feedbackRequest = new AlarmFeedbackRequest("FALSE_POSITIVE", "误报，现场无异常");
         alarmService.submitFeedback("ALM-SBX-002", feedbackRequest, "operator1");
 
         // 反馈写入漂移监测 Topic（规范：CLAUDE.md §8.1 tianjing.drift.feedback）

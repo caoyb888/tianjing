@@ -83,12 +83,14 @@ public class AlarmService {
         alarmMapper.updateById(alarm);
 
         // 向漂移监测服务发送反馈消息（tianjing.drift.feedback）
+        // feedback_type：TRUE_POSITIVE / FALSE_POSITIVE / FALSE_NEGATIVE
+        // drift-monitor-service 根据三分类计算 Precision / Recall，驱动重训练门禁
         String feedbackMsg = String.format(
-                "{\"alarm_id\":\"%s\",\"scene_id\":\"%s\",\"is_false_positive\":%b,\"operator\":\"%s\"}",
-                alarmId, alarm.getSceneId(), request.isFalsePositive(), operator);
+                "{\"alarm_id\":\"%s\",\"scene_id\":\"%s\",\"feedback_type\":\"%s\",\"operator\":\"%s\"}",
+                alarmId, alarm.getSceneId(), request.feedbackType(), operator);
         kafkaTemplate.send("tianjing.drift.feedback", alarm.getSceneId(), feedbackMsg);
 
-        log.info("提交告警反馈 alarm_id={} is_false_positive={} operator={}", alarmId, request.isFalsePositive(), operator);
+        log.info("提交告警反馈 alarm_id={} feedback_type={} operator={}", alarmId, request.feedbackType(), operator);
     }
 
     // ==============================

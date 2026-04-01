@@ -17,7 +17,8 @@ export const alarmApi = {
 
   submitFeedback: (
     alarmId: string,
-    data: { feedback_type: 'confirm' | 'reject'; comment?: string }
+    // S2-09：三选项 TRUE_POSITIVE / FALSE_POSITIVE / FALSE_NEGATIVE
+    data: { feedback_type: 'TRUE_POSITIVE' | 'FALSE_POSITIVE' | 'FALSE_NEGATIVE'; comment?: string }
   ) => request.post(`/alarms/${alarmId}/feedback`, data),
 
   retryPush: (alarmId: string) => request.post(`/alarms/${alarmId}/retry-push`),
