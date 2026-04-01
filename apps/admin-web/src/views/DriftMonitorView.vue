@@ -53,6 +53,7 @@
         <el-table-column label="操作" width="140">
           <template #default="{ row }">
             <el-button
+              v-permission="['ADMIN']"
               link size="small" type="warning"
               :disabled="!row.is_drifting"
               @click="triggerRetrain(row.scene_id)"
