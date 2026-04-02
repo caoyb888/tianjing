@@ -46,7 +46,8 @@ public class HealthQueryController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String sceneId,
-            @RequestParam(required = false) String factory) {
+            @RequestParam(required = false) String factory,
+            @RequestParam(required = false) String status) {
         int total  = cameraDeviceMapper.countTotal();
         int offset = (page - 1) * size;
         List<Map<String, Object>> rows = cameraDeviceMapper.selectCameraList(size, offset);
@@ -54,6 +55,17 @@ public class HealthQueryController {
         List<Map<String, Object>> items = rows.stream()
                 .filter(r -> sceneId == null || sceneId.equals(r.get("scene_id")))
                 .filter(r -> factory == null || factory.equals(r.get("factory_code")))
+                .filter(r -> {
+                    if (status == null) return true;
+                    String dbStatus = (String) r.get("health_status");
+                    String mapped = switch (dbStatus == null ? "" : dbStatus) {
+                        case "HEALTHY"  -> "ONLINE";
+                        case "DEGRADED" -> "DEGRADED";
+                        case "OFFLINE"  -> "OFFLINE";
+                        default         -> "UNKNOWN";
+                    };
+                    return status.equals(mapped);
+                })
                 .map(r -> {
                     String dbStatus = (String) r.get("health_status");
                     String uiStatus = switch (dbStatus == null ? "" : dbStatus) {
