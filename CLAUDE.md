@@ -1064,6 +1064,18 @@ tianjing_model_retrain_trigger_total{scene_id}         # Counter
 10. 新增微服务时未在 scripts/ 目录提供 seed_{module}.sql
     - 本地开发环境必须可通过种子数据直接运行，不依赖手动造数据
     - 种子数据文件命名规范：scripts/seed_{service_name}.sql
+11. 新增或修改 Flyway SQL Migration 时，必须同步检查对应 Entity：
+    a. 新增列 → Entity 新增字段，带 @TableField("actual_col_name")
+    b. 重命名列 → Entity 同步更新注解，不得依赖 camelCase 自动推导
+    c. 删除列 → Entity 删除字段或标注 @TableField(exist = false)
+    含 SQL Migration 的 PR，Code Review 时必须包含对应 Entity 变更作为关联提交。
+12. 禁止依赖 MyBatis-Plus 的 camelCase→underscore 自动推导（即日起生效）
+    所有 @Data Entity 中，每个字段必须是以下四种之一：
+      - @TableId          — 主键
+      - @TableField("col") — 普通列，显式写出列名
+      - @TableField(exist = false) — 非数据库字段
+      - @TableLogic / @Version  — 逻辑删除/乐观锁专用注解
+    违反此规范的字段在 Code Review 阶段必须拦截，不得合入 develop 分支。
 ```
 
 ---
@@ -1104,8 +1116,9 @@ SCENE-STRIP-*     # 带钢厂
 
 ---
 
-*CLAUDE.md 版本：V1.1 · 编制日期：2026-04-01 · 天柱·天镜项目组*
+*CLAUDE.md 版本：V1.2 · 编制日期：2026-04-02 · 天柱·天镜项目组*
 *V1.1 变更：§15 新增 P1 规则 9-10（服务启动规范、DTO 强制规范），P2 规则 9-10（路由过渡规范、种子数据规范），源于 2026-04-01 调试实践总结*
+*V1.2 变更：§15 新增 P2 规则 11-12（Flyway Migration Entity 同步规范、禁止 MyBatis-Plus camelCase 自动推导），源于 2026-04-02 Entity 字段 DB 列名系统性修复总结*
 
 *本文件是项目唯一技术行为约束文件，与方案 V2.0 保持一致。*
 *如本文件与口头约定存在冲突，以本文件为准。*

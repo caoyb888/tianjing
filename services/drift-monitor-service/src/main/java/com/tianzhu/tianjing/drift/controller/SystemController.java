@@ -62,11 +62,14 @@ public class SystemController {
         if (roles == null) throw BusinessException.of(ErrorCode.PARAM_MISSING, "roles 字段不能为空");
         // 角色更新逻辑（通过 sys_user_role 表，此处简化记录日志）
         SysOperationLog log = new SysOperationLog();
-        log.setOperatorUsername(operator.getUsername());
-        log.setOperationType("USER_ROLE_UPDATE");
-        log.setResourceId(userId);
-        log.setRequestBody("{\"roles\":" + roles + "}");
-        log.setResult("SUCCESS");
+        log.setLogId("LOG-" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase());
+        log.setOperator(operator.getUsername());
+        log.setOperation("USER_ROLE_UPDATE");
+        log.setTargetType("SYS_USER");
+        log.setTargetId(userId);
+        log.setAfterJson("{\"roles\":" + roles + "}");
+        log.setRemark("SUCCESS");
+        log.setOperatedAt(java.time.OffsetDateTime.now());
         operationLogMapper.insert(log);
         return ApiResponse.ok();
     }
@@ -83,9 +86,9 @@ public class SystemController {
             @RequestParam(required = false) String operation_type) {
         Page<SysOperationLog> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<SysOperationLog> wrapper = new LambdaQueryWrapper<SysOperationLog>()
-                .eq(operator_username != null, SysOperationLog::getOperatorUsername, operator_username)
-                .eq(operation_type != null, SysOperationLog::getOperationType, operation_type)
-                .orderByDesc(SysOperationLog::getCreatedAt);
+                .eq(operator_username != null, SysOperationLog::getOperator, operator_username)
+                .eq(operation_type != null, SysOperationLog::getOperation, operation_type)
+                .orderByDesc(SysOperationLog::getOperatedAt);
         var result = operationLogMapper.selectPage(pageParam, wrapper);
         return ApiResponse.page(PageResult.of(result.getTotal(), page, size, result.getRecords()));
     }

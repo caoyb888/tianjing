@@ -66,7 +66,7 @@ class AlarmServiceSandboxTest {
         // 生产 CRITICAL 告警记录（is_sandbox=false, status=FAILED）
         AlarmRecord productionAlarm = buildAlarmRecord("ALM-PROD-001", false, "FAILED");
         when(alarmMapper.selectOne(any())).thenReturn(productionAlarm);
-        when(alarmMapper.updateById(any())).thenReturn(1);
+        when(alarmMapper.updateById(any(AlarmRecord.class))).thenReturn(1);
 
         // 执行重推
         alarmService.retryPush("ALM-PROD-001");
@@ -84,7 +84,7 @@ class AlarmServiceSandboxTest {
     void sandbox_alarm_feedback_writesToDriftTopic() {
         AlarmRecord sandboxAlarm = buildAlarmRecord("ALM-SBX-002", true, "PUSHED");
         when(alarmMapper.selectOne(any())).thenReturn(sandboxAlarm);
-        when(alarmMapper.updateById(any())).thenReturn(1);
+        when(alarmMapper.updateById(any(AlarmRecord.class))).thenReturn(1);
 
         AlarmFeedbackRequest feedbackRequest = new AlarmFeedbackRequest("FALSE_POSITIVE", "误报，现场无异常");
         alarmService.submitFeedback("ALM-SBX-002", feedbackRequest, "operator1");

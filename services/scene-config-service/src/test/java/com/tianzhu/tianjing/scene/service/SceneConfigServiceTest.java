@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.exception.ErrorCode;
 import com.tianzhu.tianjing.scene.domain.SceneConfig;
+import com.tianzhu.tianjing.scene.domain.SceneConfigHistory;
 import com.tianzhu.tianjing.scene.dto.SceneConfigDetail;
 import com.tianzhu.tianjing.scene.dto.SceneConfigRequest;
 import com.tianzhu.tianjing.scene.repository.SceneConfigHistoryMapper;
@@ -42,8 +43,9 @@ class SceneConfigServiceTest {
 
     @BeforeEach
     void setUp() {
+        // findAndRegisterModules 自动注册 JavaTimeModule，支持 OffsetDateTime 序列化
         sceneConfigService = new SceneConfigService(
-                sceneMapper, historyMapper, redisTemplate, new ObjectMapper());
+                sceneMapper, historyMapper, redisTemplate, new ObjectMapper().findAndRegisterModules());
     }
 
     // ========== getScene() ==========
@@ -57,7 +59,7 @@ class SceneConfigServiceTest {
         SceneConfigDetail detail = sceneConfigService.getScene("SCENE-SINTER-001");
 
         assertThat(detail.sceneId()).isEqualTo("SCENE-SINTER-001");
-        assertThat(detail.status()).isEqualTo("ACTIVE");
+        assertThat(detail.status()).isEqualTo("active");
     }
 
     @Test
@@ -76,11 +78,11 @@ class SceneConfigServiceTest {
     @DisplayName("createScene — 正常创建，状态默认 DRAFT")
     void createScene_validRequest_createsWithDraftStatus() {
         SceneConfigRequest req = buildRequest("SINTER", 1);
-        when(sceneMapper.insert(any())).thenReturn(1);
+        when(sceneMapper.insert(any(SceneConfig.class))).thenReturn(1);
 
         SceneConfigDetail detail = sceneConfigService.createScene(req, "operator1");
 
-        assertThat(detail.status()).isEqualTo("DRAFT");
+        assertThat(detail.status()).isEqualTo("draft");
         assertThat(detail.sceneId()).matches("SCENE-SINTER-[A-Z0-9]{6}");
         assertThat(detail.createdBy()).isEqualTo("operator1");
         verify(sceneMapper).insert(any(SceneConfig.class));
@@ -93,7 +95,7 @@ class SceneConfigServiceTest {
         String[] prefixes = {"SCENE-PELLET-", "SCENE-STEEL-", "SCENE-SECTION-", "SCENE-STRIP-"};
 
         for (int i = 0; i < codes.length; i++) {
-            when(sceneMapper.insert(any())).thenReturn(1);
+            when(sceneMapper.insert(any(SceneConfig.class))).thenReturn(1);
             SceneConfigDetail detail = sceneConfigService.createScene(buildRequest(codes[i], 1), "op");
             assertThat(detail.sceneId()).startsWith(prefixes[i]);
         }
@@ -107,17 +109,17 @@ class SceneConfigServiceTest {
         SceneConfig scene = buildScene("SCENE-SINTER-001", "DRAFT");
         scene.setVersion(3);
         when(sceneMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(scene);
-        when(sceneMapper.updateById(any())).thenReturn(1);
+        when(sceneMapper.updateById(any(SceneConfig.class))).thenReturn(1);
         when(sceneMapper.selectById(any())).thenReturn(scene);
         when(historyMapper.selectMaxVersion(anyString())).thenReturn(2);
-        when(historyMapper.insert(any())).thenReturn(1);
+        when(historyMapper.insert(any(SceneConfigHistory.class))).thenReturn(1);
 
         SceneConfigRequest req = buildRequest("SINTER", 3);
         SceneConfigDetail detail = sceneConfigService.updateScene("SCENE-SINTER-001", req, "editor");
 
         assertThat(detail).isNotNull();
         verify(sceneMapper).updateById(any(SceneConfig.class));
-        verify(historyMapper).insert(any()); // 历史写入
+        verify(historyMapper).insert(any(SceneConfigHistory.class)); // 历史写入
     }
 
     @Test
@@ -155,7 +157,7 @@ class SceneConfigServiceTest {
         SceneConfig scene = buildScene("SCENE-SINTER-001", "DRAFT");
         scene.setVersion(2);
         when(sceneMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(scene);
-        when(sceneMapper.updateById(any())).thenReturn(0); // 并发冲突
+        when(sceneMapper.updateById(any(SceneConfig.class))).thenReturn(0); // 并发冲突
 
         SceneConfigRequest req = buildRequest("SINTER", 2);
 
@@ -170,10 +172,10 @@ class SceneConfigServiceTest {
         SceneConfig scene = buildScene("SCENE-SINTER-001", "ACTIVE");
         scene.setVersion(1);
         when(sceneMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(scene);
-        when(sceneMapper.updateById(any())).thenReturn(1);
+        when(sceneMapper.updateById(any(SceneConfig.class))).thenReturn(1);
         when(sceneMapper.selectById(any())).thenReturn(scene);
         when(historyMapper.selectMaxVersion(anyString())).thenReturn(0);
-        when(historyMapper.insert(any())).thenReturn(1);
+        when(historyMapper.insert(any(SceneConfigHistory.class))).thenReturn(1);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
 
         sceneConfigService.updateScene("SCENE-SINTER-001", buildRequest("SINTER", 1), "editor");
@@ -220,14 +222,14 @@ class SceneConfigServiceTest {
         scene.setBoundDeviceCode("CAM-001");
         scene.setActiveModelVersionId("MODEL-V3");
         when(sceneMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(scene);
-        when(sceneMapper.updateById(any())).thenReturn(1);
+        when(sceneMapper.updateById(any(SceneConfig.class))).thenReturn(1);
         when(historyMapper.selectMaxVersion(anyString())).thenReturn(0);
-        when(historyMapper.insert(any())).thenReturn(1);
+        when(historyMapper.insert(any(SceneConfigHistory.class))).thenReturn(1);
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
 
         SceneConfigDetail detail = sceneConfigService.enableScene("SCENE-SINTER-001", "admin");
 
-        assertThat(detail.status()).isEqualTo("ACTIVE");
+        assertThat(detail.status()).isEqualTo("active");
         verify(valueOps).set(eq("tianjing:scene:active:SCENE-SINTER-001"), anyString());
     }
 
@@ -264,14 +266,14 @@ class SceneConfigServiceTest {
     void disableScene_activeScene_setsInactiveAndClearsRedis() {
         SceneConfig scene = buildScene("SCENE-SINTER-001", "ACTIVE");
         when(sceneMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(scene);
-        when(sceneMapper.updateById(any())).thenReturn(1);
+        when(sceneMapper.updateById(any(SceneConfig.class))).thenReturn(1);
         when(historyMapper.selectMaxVersion(anyString())).thenReturn(0);
-        when(historyMapper.insert(any())).thenReturn(1);
+        when(historyMapper.insert(any(SceneConfigHistory.class))).thenReturn(1);
         when(redisTemplate.delete(anyString())).thenReturn(true);
 
         SceneConfigDetail detail = sceneConfigService.disableScene("SCENE-SINTER-001", "admin");
 
-        assertThat(detail.status()).isEqualTo("INACTIVE");
+        assertThat(detail.status()).isEqualTo("inactive");
         verify(redisTemplate).delete("tianjing:scene:active:SCENE-SINTER-001");
     }
 
@@ -299,7 +301,7 @@ class SceneConfigServiceTest {
         scene.setStatus(status);
         scene.setFrameInterval(40);
         scene.setVersion(1);
-        scene.setIsDeleted(0);
+        scene.setIsDeleted(false);
         scene.setCreatedAt(OffsetDateTime.now());
         scene.setUpdatedAt(OffsetDateTime.now());
         scene.setCreatedBy("tester");

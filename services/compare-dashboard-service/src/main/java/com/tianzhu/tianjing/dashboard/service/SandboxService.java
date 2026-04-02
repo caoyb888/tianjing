@@ -58,11 +58,10 @@ public class SandboxService {
         SandboxSession session = new SandboxSession();
         session.setSessionId("SS-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
         session.setSceneId(request.sceneId());
-        session.setProductionModelVersionId(request.productionModelVersionId());
-        session.setExperimentModelVersionId(request.experimentModelVersionId());
+        session.setProdModelId(request.productionModelVersionId());
+        session.setCandidateModelId(request.experimentModelVersionId());
         session.setStatus("RUNNING");
-        session.setStartedAt(OffsetDateTime.now());
-        session.setRunningHours(0.0);
+        session.setStartAt(OffsetDateTime.now());
         session.setCreatedBy(operator);
         sessionMapper.insert(session);
         log.info("启动 Sandbox 会话 session_id={} scene_id={}", session.getSessionId(), session.getSceneId());
@@ -76,10 +75,9 @@ public class SandboxService {
             throw BusinessException.of(ErrorCode.RESOURCE_STATE_FORBIDDEN, "会话已停止");
         }
         OffsetDateTime now = OffsetDateTime.now();
-        double hours = ChronoUnit.MINUTES.between(session.getStartedAt(), now) / 60.0;
+        double hours = ChronoUnit.MINUTES.between(session.getStartAt(), now) / 60.0;
         session.setStatus("STOPPED");
-        session.setStoppedAt(now);
-        session.setRunningHours(hours);
+        session.setEndAt(now);
         sessionMapper.updateById(session);
         log.info("停止 Sandbox 会话 session_id={} running_hours={}", sessionId, hours);
         return session;
@@ -105,10 +103,12 @@ public class SandboxService {
         List<String> failedGates = new ArrayList<>();
 
         // 门禁 ①：运行时长 ≥48h
-        boolean hoursOk = session.getRunningHours() >= 48.0;
+        double runningHours = session.getStartAt() != null && session.getEndAt() != null
+                ? ChronoUnit.MINUTES.between(session.getStartAt(), session.getEndAt()) / 60.0 : 0.0;
+        boolean hoursOk = runningHours >= 48.0;
         gateDetails.put("sandbox_hours", Map.of(
                 "passed", hoursOk,
-                "current", session.getRunningHours(),
+                "current", runningHours,
                 "required", 48.0
         ));
         if (!hoursOk) failedGates.add("sandbox_accuracy_check: 运行时长不足 48h");
@@ -123,14 +123,14 @@ public class SandboxService {
         if (!precisionOk) failedGates.add("sandbox_accuracy_check: 精度提升不足 2%");
 
         // 门禁 ③：GPU 内存 ≤1.1x
-        boolean memoryOk = report.getSandboxGpuMemoryGb() == null || report.getProductionGpuMemoryGb() == null
-                || report.getSandboxGpuMemoryGb() <= report.getProductionGpuMemoryGb() * 1.1;
+        boolean memoryOk = report.getSandboxGpuMb() == null || report.getProdGpuMb() == null
+                || report.getSandboxGpuMb() <= report.getProdGpuMb() * 1.1;
         gateDetails.put("resource_consumption", Map.of("passed", memoryOk));
         if (!memoryOk) failedGates.add("resource_consumption_check: GPU 内存超限");
 
         // 门禁 ④：P99 延迟 ≤1.2x
-        boolean latencyOk = report.getSandboxP99LatencyMs() == null || report.getProductionP99LatencyMs() == null
-                || report.getSandboxP99LatencyMs() <= report.getProductionP99LatencyMs() * 1.2;
+        boolean latencyOk = report.getSandboxP99Ms() == null || report.getProdP99Ms() == null
+                || report.getSandboxP99Ms() <= report.getProdP99Ms() * 1.2;
         gateDetails.put("inference_latency", Map.of("passed", latencyOk));
         if (!latencyOk) failedGates.add("inference_latency_check: P99 延迟超限");
 

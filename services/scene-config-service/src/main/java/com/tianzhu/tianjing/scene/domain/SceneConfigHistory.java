@@ -16,15 +16,30 @@ public class SceneConfigHistory {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    @TableField("scene_id")
     private String sceneId;
-    private Integer historyVersion;
-    private String configSnapshot;   // 变更后的完整配置 JSON 快照
-    private String changeDiff;       // 变更内容摘要（human-readable）
-    private String changeDesc;       // 操作人填写的变更说明
-    private String changeType;       // UPDATE / ENABLE / DISABLE / ROLLBACK
 
-    @TableField(fill = FieldFill.INSERT)
-    private OffsetDateTime createdAt;
+    /** DB列名 config_version */
+    @TableField("config_version")
+    private Integer configVersion;
 
-    private String createdBy;
+    /** 变更后的完整配置 JSON 快照，DB列名 snapshot_json */
+    @TableField("snapshot_json")
+    private String snapshotJson;
+
+    /** 操作类型：UPDATE / ENABLE / DISABLE / ROLLBACK */
+    @TableField("change_type")
+    private String changeType;
+
+    /** 操作人填写的变更说明 */
+    @TableField("change_desc")
+    private String changeDesc;
+
+    /** DB列名 changed_by */
+    @TableField("changed_by")
+    private String changedBy;
+
+    /** DB列名 changed_at */
+    @TableField("changed_at")
+    private OffsetDateTime changedAt;
 }

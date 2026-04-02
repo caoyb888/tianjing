@@ -203,7 +203,7 @@ public class SceneConfigService {
 
         // 将历史快照还原到当前配置
         try {
-            SceneConfig snapshot = objectMapper.readValue(history.getConfigSnapshot(), SceneConfig.class);
+            SceneConfig snapshot = objectMapper.readValue(history.getSnapshotJson(), SceneConfig.class);
             scene.setAlarmConfigJson(snapshot.getAlarmConfigJson());
             scene.setAlgoParamsJson(snapshot.getAlgoParamsJson());
             scene.setFrameInterval(snapshot.getFrameInterval());
@@ -274,7 +274,7 @@ public class SceneConfigService {
         var result = historyMapper.selectPage(pageParam,
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SceneConfigHistory>()
                         .eq(SceneConfigHistory::getSceneId, sceneId)
-                        .orderByDesc(SceneConfigHistory::getHistoryVersion));
+                        .orderByDesc(SceneConfigHistory::getConfigVersion));
         return PageResult.of(result.getTotal(), page, size, result.getRecords());
     }
 
@@ -284,13 +284,14 @@ public class SceneConfigService {
 
         SceneConfigHistory history = new SceneConfigHistory();
         history.setSceneId(scene.getSceneId());
-        history.setHistoryVersion(nextVersion);
+        history.setConfigVersion(nextVersion);
         history.setChangeType(changeType);
         history.setChangeDesc(changeDesc);
-        history.setCreatedBy(operator);
+        history.setChangedBy(operator);
+        history.setChangedAt(java.time.OffsetDateTime.now());
 
         try {
-            history.setConfigSnapshot(objectMapper.writeValueAsString(scene));
+            history.setSnapshotJson(objectMapper.writeValueAsString(scene));
         } catch (Exception e) {
             log.warn("配置快照序列化失败，跳过历史写入: {}", e.getMessage());
         }

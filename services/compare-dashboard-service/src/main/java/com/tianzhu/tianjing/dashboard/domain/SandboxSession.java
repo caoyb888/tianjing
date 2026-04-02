@@ -12,18 +12,45 @@ import java.time.OffsetDateTime;
 @TableName(value = "sandbox_infer_session", schema = "tianjing_sandbox")
 public class SandboxSession {
     @TableId(type = IdType.AUTO) private Long id;
+
+    @TableField("session_id")
     private String sessionId;
+
+    @TableField("scene_id")
     private String sceneId;
-    /** 对照的生产模型版本 */
-    private String productionModelVersionId;
-    /** 实验模型版本 */
-    private String experimentModelVersionId;
+
+    /** 对照的生产模型版本，DB列名 prod_model_id */
+    @TableField("prod_model_id")
+    private String prodModelId;
+
+    /** 实验候选模型版本，DB列名 candidate_model_id */
+    @TableField("candidate_model_id")
+    private String candidateModelId;
+
+    @TableField("mirror_fps")
+    private Integer mirrorFps;
+
     /** 状态：RUNNING / STOPPED / COMPLETED */
+    @TableField("status")
     private String status;
-    private OffsetDateTime startedAt;
-    private OffsetDateTime stoppedAt;
-    /** 已运行小时数（精度评估用） */
-    private Double runningHours;
+
+    /** DB列名 start_at */
+    @TableField("start_at")
+    private OffsetDateTime startAt;
+
+    /** DB列名 end_at */
+    @TableField("end_at")
+    private OffsetDateTime endAt;
+
+    @TableField("total_frames")
+    private Integer totalFrames;
+
+    @TableField("total_anomaly_frames")
+    private Integer totalAnomalyFrames;
+
+    @TableField("created_by")
     private String createdBy;
-    @TableField(fill = FieldFill.INSERT) private OffsetDateTime createdAt;
+
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
+    private OffsetDateTime createdAt;
 }

@@ -63,7 +63,7 @@ class AuthServiceTest {
         SysUser user = buildUser("ACTIVE");
         when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
         when(userMapper.selectRolesByUserId(user.getId())).thenReturn(List.of("OPERATOR"));
-        when(userMapper.updateById(any())).thenReturn(1);
+        when(userMapper.updateById(any(SysUser.class))).thenReturn(1);
         when(jwtTokenProvider.generateAccessToken(anyString(), anyLong(), anyList())).thenReturn(TOKEN);
         when(jwtProperties.getAccessTokenExpireSeconds()).thenReturn(3600L);
 
@@ -72,7 +72,7 @@ class AuthServiceTest {
         assertThat(resp.accessToken()).isEqualTo(TOKEN);
         assertThat(resp.user().username()).isEqualTo("testuser");
         assertThat(resp.user().roles()).contains("OPERATOR");
-        verify(userMapper).updateById(argThat(u -> ((SysUser) u).getFailedLoginCount() == 0));
+        verify(userMapper).updateById(argThat((SysUser u) -> u.getFailedLoginCount() == 0));
     }
 
     @Test
@@ -93,13 +93,13 @@ class AuthServiceTest {
         SysUser user = buildUser("ACTIVE");
         user.setFailedLoginCount(0);
         when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
-        when(userMapper.updateById(any())).thenReturn(1);
+        when(userMapper.updateById(any(SysUser.class))).thenReturn(1);
 
         assertThatExceptionOfType(BusinessException.class)
                 .isThrownBy(() -> authService.login(new LoginRequest("testuser", "wrongpass")))
                 .satisfies(e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CREDENTIALS_INVALID));
 
-        verify(userMapper).updateById(argThat(u -> ((SysUser) u).getFailedLoginCount() == 1));
+        verify(userMapper).updateById(argThat((SysUser u) -> u.getFailedLoginCount() == 1));
     }
 
     @Test
@@ -119,12 +119,12 @@ class AuthServiceTest {
         SysUser user = buildUser("ACTIVE");
         user.setFailedLoginCount(4); // 第 5 次失败触发锁定
         when(userMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(user);
-        when(userMapper.updateById(any())).thenReturn(1);
+        when(userMapper.updateById(any(SysUser.class))).thenReturn(1);
 
         assertThatExceptionOfType(BusinessException.class)
                 .isThrownBy(() -> authService.login(new LoginRequest("testuser", "wrongpass")));
 
-        verify(userMapper).updateById(argThat(u -> "LOCKED".equals(((SysUser) u).getStatus())));
+        verify(userMapper).updateById(argThat((SysUser u) -> "LOCKED".equals(u.getStatus())));
     }
 
     // ========== getCurrentUser() ==========
@@ -235,7 +235,7 @@ class AuthServiceTest {
         user.setDisplayName("测试用户");
         user.setStatus(status);
         user.setFailedLoginCount(0);
-        user.setIsDeleted(0);
+        user.setIsDeleted(false);
         user.setCreatedAt(OffsetDateTime.now());
         return user;
     }

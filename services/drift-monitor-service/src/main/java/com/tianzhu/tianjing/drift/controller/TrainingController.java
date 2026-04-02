@@ -18,7 +18,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -71,9 +70,7 @@ public class TrainingController {
         job.setDatasetVersionId(request.datasetVersionId());
         job.setGpuCount(request.gpuCount() != null ? request.gpuCount() : 1);
         job.setTriggerType("MANUAL");
-        job.setTriggerReason(request.triggerReason());
         job.setStatus("PENDING");
-        job.setEstimatedStartAt(OffsetDateTime.now().plusMinutes(5));
         job.setCreatedBy(user.getUsername());
         try {
             job.setTrainConfigJson(new com.fasterxml.jackson.databind.ObjectMapper()

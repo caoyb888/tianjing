@@ -1,44 +1,80 @@
 package com.tianzhu.tianjing.device.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tianzhu.tianjing.device.domain.CameraDevice;
 
 import java.time.OffsetDateTime;
 
 /**
  * 设备详情响应体
- * RTSP URL 脱敏：仅返回 host 部分（去掉用户名密码）
+ * 字段名与前端 DeviceInfo 类型严格对齐（camelCase）
+ * RTSP URL 脱敏：仅返回 IP 地址
  */
 public record DeviceDetail(
-        @JsonProperty("device_code") String deviceCode,
-        @JsonProperty("device_name") String deviceName,
-        @JsonProperty("scene_id") String sceneId,
-        @JsonProperty("ip_address") String ipAddress,
-        @JsonProperty("mac_address") String macAddress,
+        String deviceCode,
+        String deviceName,
+        String sceneId,
+        String factory,          // 从 scene_id 前缀推断，如 SCENE-PELLET-001 → PELLET
+        String ipAddress,
+        String macAddress,
         String vendor,
-        @JsonProperty("firmware_version") String firmwareVersion,
-        @JsonProperty("rtsp_host") String rtspHost,   // 脱敏：仅 IP:port
+        String firmwareVersion,
         String protocol,
-        @JsonProperty("resolution_width") Integer resolutionWidth,
-        @JsonProperty("resolution_height") Integer resolutionHeight,
+        Integer resolutionWidth,
+        Integer resolutionHeight,
         Integer fps,
-        @JsonProperty("location_desc") String locationDesc,
-        @JsonProperty("is_supplement_light") Boolean isSupplementLight,
-        @JsonProperty("health_status") String healthStatus,
-        @JsonProperty("created_at") OffsetDateTime createdAt,
-        @JsonProperty("updated_at") OffsetDateTime updatedAt
+        String locationDesc,
+        Boolean isSupplementLight,
+        String healthStatus,     // 原始值：HEALTHY / BLURRY / OFFLINE / SHIFTED / UNKNOWN
+        String status,           // 前端语义值：online / offline / warning
+        String lastHeartbeat,    // ISO 8601 字符串，来自 lastHealthCheck
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt
 ) {
     public static DeviceDetail from(CameraDevice device) {
+        String status = mapStatus(device.getHealthStatus());
+        String factory = extractFactory(device.getSceneId());
+        String lastHeartbeat = device.getLastHealthCheck() != null
+                ? device.getLastHealthCheck().toString() : null;
+
         return new DeviceDetail(
-                device.getDeviceCode(), device.getDeviceName(), device.getSceneId(),
-                device.getIpAddress(), device.getMacAddress(), device.getVendor(),
+                device.getDeviceCode(),
+                device.getDeviceName(),
+                device.getSceneId(),
+                factory,
+                device.getIpAddress(),
+                device.getMacAddress(),
+                device.getVendor(),
                 device.getFirmwareVersion(),
-                device.getIpAddress(),  // rtsp_host：仅返回 IP（原始加密，无需解密）
                 device.getProtocol(),
-                device.getResolutionWidth(), device.getResolutionHeight(), device.getFps(),
-                device.getLocationDesc(), device.getIsSupplementLight(),
+                device.getResolutionWidth(),
+                device.getResolutionHeight(),
+                device.getFps(),
+                device.getLocationDesc(),
+                device.getIsSupplementLight(),
                 device.getHealthStatus(),
-                device.getCreatedAt(), device.getUpdatedAt()
+                status,
+                lastHeartbeat,
+                device.getCreatedAt(),
+                device.getUpdatedAt()
         );
+    }
+
+    /** 将数据库健康状态映射为前端语义状态 */
+    private static String mapStatus(String healthStatus) {
+        if (healthStatus == null) return "offline";
+        return switch (healthStatus) {
+            case "HEALTHY"  -> "online";
+            case "OFFLINE"  -> "offline";
+            case "BLURRY", "SHIFTED" -> "warning";
+            default         -> "offline";   // UNKNOWN 等
+        };
+    }
+
+    /** 从场景 ID 推断厂部代码，如 SCENE-PELLET-001 → PELLET */
+    private static String extractFactory(String sceneId) {
+        if (sceneId == null) return null;
+        // 格式：SCENE-{FACTORY}-{序号}
+        String[] parts = sceneId.split("-");
+        return parts.length >= 2 ? parts[1] : null;
     }
 }

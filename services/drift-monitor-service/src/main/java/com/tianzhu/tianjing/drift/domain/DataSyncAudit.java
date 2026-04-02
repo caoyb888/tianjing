@@ -13,15 +13,59 @@ import java.time.OffsetDateTime;
 @TableName("data_sync_audit")
 public class DataSyncAudit {
     @TableId(type = IdType.AUTO) private Long id;
-    private String batchId;
-    /** 同步类型：PROD_TO_TRAIN / MODEL_TO_STAGING */
-    private String syncType;
-    private Integer fileCount;
-    private Long totalBytes;
-    private String checksumMethod;
-    private String status;
-    private String errorMessage;
-    @TableField(fill = FieldFill.INSERT) private OffsetDateTime createdAt;
-    private OffsetDateTime completedAt;
-    private String createdBy;
+
+    /** DB列名 sync_batch_id */
+    @TableField("sync_batch_id")
+    private String syncBatchId;
+
+    @TableField("scene_id")
+    private String sceneId;
+
+    @TableField("factory_code")
+    private String factoryCode;
+
+    /** DB列名 image_count */
+    @TableField("image_count")
+    private Integer imageCount;
+
+    @TableField("desensitize_rule")
+    private String desensitizeRule;
+
+    /** DB列名 total_size_mb */
+    @TableField("total_size_mb")
+    private Double totalSizeMb;
+
+    @TableField("source_minio_prefix")
+    private String sourceMinioPprefix;
+
+    @TableField("dest_minio_prefix")
+    private String destMinioPrefix;
+
+    @TableField("gap_device_id")
+    private String gapDeviceId;
+
+    /** DB列名 sync_status */
+    @TableField("sync_status")
+    private String syncStatus;
+
+    /** DB列名 error_msg */
+    @TableField("error_msg")
+    private String errorMsg;
+
+    @TableField("checksum_before")
+    private String checksumBefore;
+
+    @TableField("checksum_after")
+    private String checksumAfter;
+
+    @TableField("operator")
+    private String operator;
+
+    /** DB列名 synced_at */
+    @TableField("synced_at")
+    private OffsetDateTime syncedAt;
+
+    /** data_sync_audit 表无 created_at 列（分区键为 synced_at） */
+    @TableField(exist = false)
+    private OffsetDateTime createdAt;
 }

@@ -1,0 +1,30 @@
+# 集成测试专用 Profile（-Pintegration-test 激活）
+# compare-dashboard-service 使用 tianjing_sandbox 库（Sandbox 专用）
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+  datasource:
+    url: jdbc:postgresql://localhost:5432/tianjing_test
+    username: test
+    password: test
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    # @TableName(schema="tianjing_sandbox") 要求表在 tianjing_sandbox 模式下
+    # spring.flyway.schemas 让 Flyway 在该 PostgreSQL Schema 下创建表
+    schemas: tianjing_sandbox
+    locations: filesystem:../../deploy/flyway/sandbox
+    baseline-on-migrate: false
+    out-of-order: false
+
+tianjing:
+  jwt:
+    public-key-pem: ""
+
+logging:
+  level:
+    com.tianzhu.tianjing: WARN
+    org.flywaydb: INFO

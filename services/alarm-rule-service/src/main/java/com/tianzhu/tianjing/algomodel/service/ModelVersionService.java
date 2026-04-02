@@ -46,7 +46,7 @@ public class ModelVersionService {
 
     public ModelVersion getVersion(String modelVersionId) {
         ModelVersion mv = modelVersionMapper.selectOne(new LambdaQueryWrapper<ModelVersion>()
-                .eq(ModelVersion::getModelVersionId, modelVersionId));
+                .eq(ModelVersion::getVersionId, modelVersionId));
         if (mv == null) throw BusinessException.notFound(ErrorCode.MODEL_VERSION_NOT_FOUND);
         return mv;
     }
@@ -54,16 +54,16 @@ public class ModelVersionService {
     @Transactional
     public ModelVersion registerVersion(ModelRegisterRequest request, String operator) {
         ModelVersion mv = new ModelVersion();
-        mv.setModelVersionId("MV-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
+        mv.setVersionId("MV-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
         mv.setPluginId(request.pluginId());
-        mv.setVersion(request.version());
         mv.setMlflowRunId(request.mlflowRunId());
-        mv.setModelArtifactUrl(request.modelArtifactUrl());
+        mv.setModelPath(request.modelArtifactUrl());
+        mv.setTrainJobId(request.trainingJobId());
         mv.setStatus("STAGING");
-        mv.setSubmittedBy(operator);
         mv.setCreatedBy(operator);
+        mv.setUpdatedBy(operator);
         modelVersionMapper.insert(mv);
-        log.info("注册模型版本 model_version_id={} plugin_id={} operator={}", mv.getModelVersionId(), mv.getPluginId(), operator);
+        log.info("注册模型版本 version_id={} plugin_id={} operator={}", mv.getVersionId(), mv.getPluginId(), operator);
         return mv;
     }
 
@@ -73,6 +73,7 @@ public class ModelVersionService {
     @Transactional
     public ModelVersion submitReview(String modelVersionId, String operator) {
         ModelVersion mv = getVersion(modelVersionId);
+        mv.setUpdatedBy(operator);
         if (!"STAGING".equals(mv.getStatus()) && !"SANDBOX_VALIDATING".equals(mv.getStatus())) {
             throw BusinessException.of(ErrorCode.RESOURCE_STATE_FORBIDDEN,
                     "当前状态 " + mv.getStatus() + " 不允许提交审核");
@@ -95,13 +96,13 @@ public class ModelVersionService {
         }
 
         // 四眼原则：审核人不能是提交人
-        if (reviewer.equals(mv.getSubmittedBy())) {
+        if (reviewer.equals(mv.getCreatedBy())) {
             throw BusinessException.forbidden(ErrorCode.FOUR_EYES_VIOLATION);
         }
 
-        mv.setReviewedBy(reviewer);
-        mv.setReviewComment(request.comment());
-        mv.setReviewedAt(OffsetDateTime.now());
+        mv.setApprovedBy(reviewer);
+        mv.setApprovedAt(OffsetDateTime.now());
+        mv.setUpdatedBy(reviewer);
 
         if (request.approved()) {
             // 蓝绿切换：将旧生产版本标记为 DEPRECATED
@@ -111,10 +112,11 @@ public class ModelVersionService {
                     .set(ModelVersion::getStatus, "DEPRECATED"));
 
             mv.setStatus("PRODUCTION");
-            log.info("模型版本审核通过并上线 model_version_id={} reviewer={}", modelVersionId, reviewer);
+            mv.setDeployedAt(OffsetDateTime.now());
+            log.info("模型版本审核通过并上线 version_id={} reviewer={}", modelVersionId, reviewer);
         } else {
             mv.setStatus("STAGING");
-            log.info("模型版本审核拒绝 model_version_id={} reviewer={}", modelVersionId, reviewer);
+            log.info("模型版本审核拒绝 version_id={} reviewer={}", modelVersionId, reviewer);
         }
 
         modelVersionMapper.updateById(mv);
@@ -125,7 +127,9 @@ public class ModelVersionService {
     public void deprecate(String modelVersionId, String operator) {
         ModelVersion mv = getVersion(modelVersionId);
         mv.setStatus("DEPRECATED");
+        mv.setDeprecatedAt(OffsetDateTime.now());
+        mv.setUpdatedBy(operator);
         modelVersionMapper.updateById(mv);
-        log.info("废弃模型版本 model_version_id={} operator={}", modelVersionId, operator);
+        log.info("废弃模型版本 version_id={} operator={}", modelVersionId, operator);
     }
 }

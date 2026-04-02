@@ -1,0 +1,30 @@
+# 集成测试专用 Profile（-Pintegration-test 激活）
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  datasource:
+    url: jdbc:postgresql://localhost:5432/tianjing_test
+    username: test
+    password: test
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: filesystem:../../deploy/flyway/prod
+    baseline-on-migrate: false
+    out-of-order: false
+
+tianjing:
+  jwt:
+    public-key-pem: ""
+  # MinioClient 由 MinioConfig 通过 @Value 构建，下面占位值保证 Bean 创建不报错
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin123
+
+logging:
+  level:
+    com.tianzhu.tianjing: WARN
+    org.flywaydb: INFO

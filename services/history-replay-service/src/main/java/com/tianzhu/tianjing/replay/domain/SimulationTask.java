@@ -13,22 +13,74 @@ import java.time.OffsetDateTime;
 @TableName("simulation_task")
 public class SimulationTask {
     @TableId(type = IdType.AUTO) private Long id;
+
+    @TableField("task_id")
     private String taskId;
+
+    @TableField("scene_id")
     private String sceneId;
-    private String videoFileName;
-    /** MinIO 对象路径 */
-    private String videoObjectPath;
+
+    /** DB列名 task_name */
+    @TableField("task_name")
+    private String taskName;
+
+    /** 视频文件 URL（MinIO），DB列名 video_file_url */
+    @TableField("video_file_url")
+    private String videoFileUrl;
+
+    @TableField("video_duration_s")
+    private Integer videoDurationS;
+
+    @TableField("video_fps")
+    private Integer videoFps;
+
+    @TableField("workflow_json")
+    private String workflowJson;
+
+    @TableField("algo_config_json")
+    private String algoConfigJson;
+
     /** 状态：PENDING / RUNNING / COMPLETED / FAILED */
+    @TableField("status")
     private String status;
-    /** 仿真进度（0-100） */
-    private Integer progressPercent;
-    /** 仿真结果摘要 JSON */
-    private String resultSummaryJson;
-    /** 上传时间（72h 过期基准） */
-    private OffsetDateTime uploadedAt;
+
+    @TableField("total_frames")
+    private Integer totalFrames;
+
+    @TableField("matched_alarms")
+    private Integer matchedAlarms;
+
+    @TableField("false_alarm_count")
+    private Integer falseAlarmCount;
+
+    /** 仿真结果摘要，DB列名 result_summary */
+    @TableField("result_summary")
+    private String resultSummary;
+
+    @TableField("result_json")
+    private String resultJson;
+
+    @TableField("error_msg")
+    private String errorMsg;
+
+    @TableField("started_at")
     private OffsetDateTime startedAt;
-    private OffsetDateTime completedAt;
+
+    /** DB列名 finished_at */
+    @TableField("finished_at")
+    private OffsetDateTime finishedAt;
+
     @TableLogic private Boolean isDeleted;
-    @TableField(fill = FieldFill.INSERT) private OffsetDateTime createdAt;
+
+    @TableField(value = "created_at", fill = FieldFill.INSERT) private OffsetDateTime createdAt;
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE) private OffsetDateTime updatedAt;
+
+    @TableField("created_by")
     private String createdBy;
+
+    @TableField("updated_by")
+    private String updatedBy;
+
+    @Version
+    private Integer version;
 }

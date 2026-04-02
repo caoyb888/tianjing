@@ -57,6 +57,7 @@
         <commons-lang3.version>3.14.0</commons-lang3.version>
         <guava.version>33.1.0-jre</guava.version>
         <nacos-client.version>2.3.2</nacos-client.version>
+        <testcontainers.version>1.19.7</testcontainers.version>
     </properties>
 
     <dependencyManagement>
@@ -138,6 +139,15 @@
                 <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
                 <version>2023.0.1.0</version>
             </dependency>
+
+            <!-- Testcontainers BOM（集成测试，仅 integration-test profile 激活） -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -158,6 +168,57 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!-- 集成测试 Profile：mvn verify -Pintegration-test -->
+        <profile>
+            <id>integration-test</id>
+            <dependencies>
+                <!-- Testcontainers：PostgreSQL 容器 -->
+                <dependency>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>postgresql</artifactId>
+                    <scope>test</scope>
+                </dependency>
+                <!-- Testcontainers：JUnit5 扩展 -->
+                <dependency>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>junit-jupiter</artifactId>
+                    <scope>test</scope>
+                </dependency>
+                <!-- Spring Boot Testcontainers 支持（@ServiceConnection 等） -->
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-testcontainers</artifactId>
+                    <scope>test</scope>
+                </dependency>
+                <!-- Flyway（在容器内运行 Migration，保证 Schema 与生产一致） -->
+                <dependency>
+                    <groupId>org.flywaydb</groupId>
+                    <artifactId>flyway-core</artifactId>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <!-- maven-failsafe-plugin：执行 *IT.java 集成测试 -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>3.2.5</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <build>
         <pluginManagement>

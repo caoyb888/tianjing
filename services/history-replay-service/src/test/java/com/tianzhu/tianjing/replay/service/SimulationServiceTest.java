@@ -74,7 +74,7 @@ class SimulationServiceTest {
 
         assertThatExceptionOfType(BusinessException.class)
                 .isThrownBy(() -> simulationService.uploadVideo(file, "SCENE-SINTER-001"))
-                .withMessageContaining("视频上传失败");
+                .satisfies(e -> assertThat(e.getDetail()).contains("视频上传失败"));
     }
 
     @Test
@@ -95,16 +95,15 @@ class SimulationServiceTest {
     void createTask_validRequest_createsTaskWithCorrectDefaults() {
         String videoUrl = MINIO_ENDPOINT + "/" + SIM_BUCKET + "/simulation/SCENE-SINTER-005/uuid/video.mp4";
         SimulationCreateRequest req = new SimulationCreateRequest("SCENE-SINTER-005", videoUrl);
-        when(taskMapper.insert(any())).thenReturn(1);
+        when(taskMapper.insert(any(SimulationTask.class))).thenReturn(1);
 
         SimulationTask task = simulationService.createTask(req, "operator1");
 
         assertThat(task.getTaskId()).matches("SIM-[A-Z0-9]{8}");
         assertThat(task.getSceneId()).isEqualTo("SCENE-SINTER-005");
         assertThat(task.getStatus()).isEqualTo("PENDING");
-        assertThat(task.getProgressPercent()).isEqualTo(0);
-        assertThat(task.getVideoFileName()).isEqualTo("video.mp4");
-        assertThat(task.getVideoObjectPath()).isEqualTo("simulation/SCENE-SINTER-005/uuid/video.mp4");
+        assertThat(task.getTaskName()).isEqualTo("video.mp4");
+        assertThat(task.getVideoFileUrl()).contains("video.mp4");
         assertThat(task.getCreatedBy()).isEqualTo("operator1");
         verify(taskMapper).insert(task);
     }
@@ -114,12 +113,12 @@ class SimulationServiceTest {
     void createTask_urlWithoutBucket_usesUrlAsObjectPath() {
         String videoUrl = "http://other-host:9000/some-other-bucket/some-path/file.mp4";
         SimulationCreateRequest req = new SimulationCreateRequest("SCENE-PELLET-001", videoUrl);
-        when(taskMapper.insert(any())).thenReturn(1);
+        when(taskMapper.insert(any(SimulationTask.class))).thenReturn(1);
 
         SimulationTask task = simulationService.createTask(req, "op");
 
-        // fallback: 整个 URL 作为 objectPath
-        assertThat(task.getVideoFileName()).isEqualTo("file.mp4");
+        // fallback: 整个 URL 作为 videoFileUrl
+        assertThat(task.getTaskName()).isEqualTo("file.mp4");
     }
 
     // ========== getTaskProgress() ==========
@@ -183,7 +182,7 @@ class SimulationServiceTest {
     void cancelTask_pendingTask_setsStatusFailed() {
         SimulationTask task = buildTask("PENDING", OffsetDateTime.now().minusMinutes(5));
         when(taskMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(task);
-        when(taskMapper.updateById(any())).thenReturn(1);
+        when(taskMapper.updateById(any(SimulationTask.class))).thenReturn(1);
 
         simulationService.cancelTask("SIM-00000001", "admin");
 
@@ -196,7 +195,7 @@ class SimulationServiceTest {
     void cancelTask_runningTask_setsStatusFailed() {
         SimulationTask task = buildTask("RUNNING", OffsetDateTime.now().minusMinutes(10));
         when(taskMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(task);
-        when(taskMapper.updateById(any())).thenReturn(1);
+        when(taskMapper.updateById(any(SimulationTask.class))).thenReturn(1);
 
         simulationService.cancelTask("SIM-00000001", "admin");
 
@@ -213,7 +212,7 @@ class SimulationServiceTest {
                 .isThrownBy(() -> simulationService.cancelTask("SIM-00000001", "op"))
                 .satisfies(e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RESOURCE_STATE_FORBIDDEN));
 
-        verify(taskMapper, never()).updateById(any());
+        verify(taskMapper, never()).updateById(any(SimulationTask.class));
     }
 
     @Test
@@ -234,11 +233,10 @@ class SimulationServiceTest {
         task.setId(1L);
         task.setTaskId("SIM-00000001");
         task.setSceneId("SCENE-SINTER-005");
-        task.setVideoFileName("test.mp4");
-        task.setVideoObjectPath("simulation/SCENE-SINTER-005/uuid/test.mp4");
+        task.setTaskName("test.mp4");
+        task.setVideoFileUrl("simulation/SCENE-SINTER-005/uuid/test.mp4");
         task.setStatus(status);
-        task.setProgressPercent(0);
-        task.setUploadedAt(uploadedAt);
+        task.setStartedAt(uploadedAt);
         task.setCreatedBy("tester");
         return task;
     }

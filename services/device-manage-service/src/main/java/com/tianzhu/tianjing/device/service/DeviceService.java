@@ -81,15 +81,15 @@ public class DeviceService {
         device.setFps(request.fps());
         device.setLocationDesc(request.locationDesc());
         device.setIsSupplementLight(request.isSupplementLight());
-        device.setHealthStatus("ONLINE");
+        device.setHealthStatus("UNKNOWN");
         device.setCreatedBy(operator);
 
         // SECURITY: RTSP URL AES-256 加密存储
         if (StringUtils.isNotBlank(request.rtspUrl()) && StringUtils.isNotBlank(aesKey)) {
-            device.setRtspUrlEncrypted(AesEncryptUtil.encrypt(request.rtspUrl(), aesKey));
+            device.setRtspUrl(AesEncryptUtil.encrypt(request.rtspUrl(), aesKey));
         } else if (StringUtils.isNotBlank(request.rtspUrl())) {
             log.warn("AES 密钥未配置，RTSP URL 将明文存储（仅限开发环境）");
-            device.setRtspUrlEncrypted(request.rtspUrl());
+            device.setRtspUrl(request.rtspUrl());
         }
 
         deviceMapper.insert(device);
@@ -104,7 +104,7 @@ public class DeviceService {
         if (request.locationDesc() != null) device.setLocationDesc(request.locationDesc());
         if (request.firmwareVersion() != null) device.setFirmwareVersion(request.firmwareVersion());
         if (StringUtils.isNotBlank(request.rtspUrl()) && StringUtils.isNotBlank(aesKey)) {
-            device.setRtspUrlEncrypted(AesEncryptUtil.encrypt(request.rtspUrl(), aesKey));
+            device.setRtspUrl(AesEncryptUtil.encrypt(request.rtspUrl(), aesKey));
         }
         deviceMapper.updateById(device);
         log.info("更新设备信息 device_code={} operator={}", deviceCode, operator);

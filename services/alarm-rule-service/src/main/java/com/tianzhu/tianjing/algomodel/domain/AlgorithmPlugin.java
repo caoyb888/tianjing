@@ -11,22 +11,58 @@ import java.time.OffsetDateTime;
 @TableName("algorithm_plugin")
 public class AlgorithmPlugin {
     @TableId(type = IdType.AUTO) private Long id;
+
+    @TableField("plugin_id")
     private String pluginId;
+
+    @TableField("plugin_name")
     private String pluginName;
+
+    @TableField("version")
     private String version;
+
+    @TableField("plugin_type")
     private String pluginType;
+
+    @TableField("is_atom")
+    private Boolean isAtom;
+
+    @TableField("parent_plugin_id")
+    private String parentPluginId;
+
+    @TableField("backbone")
     private String backbone;
-    // DB 中以 metadata_json 存储，以下字段在实体层不映射
+
+    /** DB 中以 metadata_json 存储，以下字段在实体层不映射 */
     @TableField(exist = false) private String supportedScenes;
     @TableField(exist = false) private String hardwareRequirementsJson;
     @TableField(exist = false) private String accuracyMetricsJson;
+
+    @TableField("metadata_json")
     private String metadataJson;
+
+    @TableField("ui_schema_json")
     private String uiSchemaJson;
+
+    @TableField("infer_backend")
     private String inferBackend;
+
+    @TableField("status")
     private String status;
+
+    @TableField("current_model_version_id")
+    private String currentModelVersionId;
+
     @TableField(value = "version_lock") @Version private Integer versionLock;
+
     @TableLogic private Boolean isDeleted;
-    @TableField(fill = FieldFill.INSERT) private OffsetDateTime createdAt;
-    @TableField(fill = FieldFill.INSERT_UPDATE) private OffsetDateTime updatedAt;
+
+    @TableField(value = "created_at", fill = FieldFill.INSERT) private OffsetDateTime createdAt;
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE) private OffsetDateTime updatedAt;
+
+    @TableField("created_by")
     private String createdBy;
+
+    @TableField("updated_by")
+    private String updatedBy;
 }

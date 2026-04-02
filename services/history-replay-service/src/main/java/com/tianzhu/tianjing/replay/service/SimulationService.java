@@ -67,8 +67,8 @@ public class SimulationService {
      * @return { url, object_path }
      */
     public Map<String, String> uploadVideo(MultipartFile file, String sceneId) {
-        String originalName = file.getOriginalFilename() != null
-                ? file.getOriginalFilename() : "video.mp4";
+        String rawName = file.getOriginalFilename();
+        String originalName = (rawName != null && !rawName.isEmpty()) ? rawName : "video.mp4";
         String objectPath = "simulation/" + sceneId + "/" + UUID.randomUUID() + "/" + originalName;
 
         try {
@@ -102,12 +102,12 @@ public class SimulationService {
         SimulationTask task = new SimulationTask();
         task.setTaskId("SIM-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
         task.setSceneId(request.sceneId());
-        task.setVideoFileName(fileName);
-        task.setVideoObjectPath(objectPath);
+        task.setTaskName(fileName);
+        task.setVideoFileUrl(videoUrl);
         task.setStatus("PENDING");
-        task.setProgressPercent(0);
-        task.setUploadedAt(OffsetDateTime.now());
+        task.setStartedAt(OffsetDateTime.now());
         task.setCreatedBy(operator);
+        task.setUpdatedBy(operator);
         taskMapper.insert(task);
         log.info("创建仿真任务 task_id={} scene_id={}", task.getTaskId(), task.getSceneId());
         return task;
@@ -115,8 +115,8 @@ public class SimulationService {
 
     public SimulationTask getTaskProgress(String taskId) {
         SimulationTask task = getTask(taskId);
-        if (task.getUploadedAt() != null) {
-            long hoursElapsed = ChronoUnit.HOURS.between(task.getUploadedAt(), OffsetDateTime.now());
+        if (task.getStartedAt() != null) {
+            long hoursElapsed = ChronoUnit.HOURS.between(task.getStartedAt(), OffsetDateTime.now());
             if (hoursElapsed >= 72) {
                 throw BusinessException.of(ErrorCode.SIMULATION_VIDEO_EXPIRED,
                         "视频文件已超过 72 小时，已自动清理");

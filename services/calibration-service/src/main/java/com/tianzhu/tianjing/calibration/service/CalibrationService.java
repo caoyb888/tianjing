@@ -38,11 +38,11 @@ public class CalibrationService {
 
     @Transactional
     public CalibrationRecord submitCalibration(String sceneId, CalibrationRequest request, String operator) {
-        // 将同场景旧标定记录状态置为 SUPERSEDED
+        // 将同场景旧标定记录标记为非激活
         calibrationMapper.update(new LambdaUpdateWrapper<CalibrationRecord>()
                 .eq(CalibrationRecord::getSceneId, sceneId)
-                .eq(CalibrationRecord::getStatus, "ACTIVE")
-                .set(CalibrationRecord::getStatus, "SUPERSEDED"));
+                .eq(CalibrationRecord::getIsActive, true)
+                .set(CalibrationRecord::getIsActive, false));
 
         double dx = request.pt2X() - request.pt1X();
         double dy = request.pt2Y() - request.pt1Y();
@@ -59,15 +59,17 @@ public class CalibrationService {
         record.setCalibrationId("CAL-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase());
         record.setSceneId(sceneId);
         record.setDeviceCode(request.deviceCode());
-        record.setRefLengthMm(request.refLengthMm());
-        record.setPt1X(request.pt1X());
-        record.setPt1Y(request.pt1Y());
-        record.setPt2X(request.pt2X());
-        record.setPt2Y(request.pt2Y());
+        record.setRefDistanceMm(request.refLengthMm());
+        record.setPixelP1X(request.pt1X());
+        record.setPixelP1Y(request.pt1Y());
+        record.setPixelP2X(request.pt2X());
+        record.setPixelP2Y(request.pt2Y());
+        record.setPixelDistance((int) Math.round(distancePx));
         record.setScaleMmPerPx(scaleMmPerPx);
-        record.setStatus("ACTIVE");
-        record.setFrameImageUrl(request.frameImageUrl());
+        record.setIsActive(true);
+        record.setCalibratedBy(operator);
         record.setCreatedBy(operator);
+        record.setUpdatedBy(operator);
 
         calibrationMapper.insert(record);
         log.info("提交标定记录 scene_id={} scale_mm_per_px={} operator={}", sceneId, scaleMmPerPx, operator);

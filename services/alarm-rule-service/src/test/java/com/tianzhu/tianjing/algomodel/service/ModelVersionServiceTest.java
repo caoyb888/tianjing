@@ -50,28 +50,28 @@ class ModelVersionServiceTest {
                 new MapperBuilderAssistant(new MybatisConfiguration(), ""), ModelVersion.class);
 
         stagingVersion = new ModelVersion();
-        stagingVersion.setModelVersionId("MV-STAGING-001");
+        stagingVersion.setVersionId("MV-STAGING-001");
         stagingVersion.setPluginId("PLUGIN-001");
         stagingVersion.setStatus("STAGING");
-        stagingVersion.setSubmittedBy("alice");
+        stagingVersion.setCreatedBy("alice");
 
         sandboxValidatingVersion = new ModelVersion();
-        sandboxValidatingVersion.setModelVersionId("MV-SBX-001");
+        sandboxValidatingVersion.setVersionId("MV-SBX-001");
         sandboxValidatingVersion.setPluginId("PLUGIN-001");
         sandboxValidatingVersion.setStatus("SANDBOX_VALIDATING");
-        sandboxValidatingVersion.setSubmittedBy("alice");
+        sandboxValidatingVersion.setCreatedBy("alice");
 
         reviewingVersion = new ModelVersion();
-        reviewingVersion.setModelVersionId("MV-REVIEW-001");
+        reviewingVersion.setVersionId("MV-REVIEW-001");
         reviewingVersion.setPluginId("PLUGIN-001");
         reviewingVersion.setStatus("REVIEWING");
-        reviewingVersion.setSubmittedBy("alice");
+        reviewingVersion.setCreatedBy("alice");
 
         productionVersion = new ModelVersion();
-        productionVersion.setModelVersionId("MV-PROD-001");
+        productionVersion.setVersionId("MV-PROD-001");
         productionVersion.setPluginId("PLUGIN-001");
         productionVersion.setStatus("PRODUCTION");
-        productionVersion.setSubmittedBy("alice");
+        productionVersion.setCreatedBy("alice");
     }
 
     // ── 注册 ──────────────────────────────────────────────────
@@ -86,8 +86,8 @@ class ModelVersionServiceTest {
 
         assertThat(result.getStatus()).isEqualTo("STAGING");
         assertThat(result.getPluginId()).isEqualTo("PLUGIN-001");
-        assertThat(result.getSubmittedBy()).isEqualTo("alice");
-        assertThat(result.getModelVersionId()).startsWith("MV-");
+        assertThat(result.getCreatedBy()).isEqualTo("alice");
+        assertThat(result.getVersionId()).startsWith("MV-");
         verify(modelVersionMapper).insert(any(ModelVersion.class));
     }
 
@@ -160,7 +160,7 @@ class ModelVersionServiceTest {
         ModelVersion result = modelVersionService.approve("MV-REVIEW-001", approveReq, "bob");
 
         assertThat(result.getStatus()).isEqualTo("PRODUCTION");
-        assertThat(result.getReviewedBy()).isEqualTo("bob");
+        assertThat(result.getApprovedBy()).isEqualTo("bob");
     }
 
     @Test
@@ -172,7 +172,7 @@ class ModelVersionServiceTest {
         ModelVersion result = modelVersionService.approve("MV-REVIEW-001", rejectReq, "bob");
 
         assertThat(result.getStatus()).isEqualTo("STAGING");
-        assertThat(result.getReviewedBy()).isEqualTo("bob");
+        assertThat(result.getApprovedBy()).isEqualTo("bob");
     }
 
     // ── 蓝绿切换 ─────────────────────────────────────────────

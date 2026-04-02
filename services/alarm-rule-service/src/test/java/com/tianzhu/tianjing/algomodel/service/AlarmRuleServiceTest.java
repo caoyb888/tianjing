@@ -3,6 +3,7 @@ package com.tianzhu.tianjing.algomodel.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tianzhu.tianjing.algomodel.domain.AlgorithmPlugin;
+import com.tianzhu.tianjing.algomodel.dto.AlgorithmPluginDetail;
 import com.tianzhu.tianjing.algomodel.repository.AlgorithmPluginMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.response.PageResult;
@@ -70,7 +71,7 @@ class AlarmRuleServiceTest {
         mockPage.setTotal(2);
         when(pluginMapper.selectPage(any(), any())).thenReturn(mockPage);
 
-        PageResult<AlgorithmPlugin> result = algorithmPluginService.listPlugins(1, 10, null, null);
+        PageResult<AlgorithmPluginDetail> result = algorithmPluginService.listPlugins(1, 10, null, null);
 
         assertThat(result.getTotal()).isEqualTo(2);
         assertThat(result.getItems()).hasSize(2);
@@ -85,11 +86,11 @@ class AlarmRuleServiceTest {
         mockPage.setTotal(1);
         when(pluginMapper.selectPage(any(), any())).thenReturn(mockPage);
 
-        PageResult<AlgorithmPlugin> result = algorithmPluginService.listPlugins(1, 10, "detection", null);
+        PageResult<AlgorithmPluginDetail> result = algorithmPluginService.listPlugins(1, 10, "detection", null);
 
         assertThat(result.getTotal()).isEqualTo(1);
         assertThat(result.getItems()).hasSize(1);
-        assertThat(result.getItems().get(0).getPluginType()).isEqualTo("detection");
+        assertThat(result.getItems().get(0).pluginType()).isEqualTo("detection");
     }
 
     @Test
@@ -100,7 +101,7 @@ class AlarmRuleServiceTest {
         mockPage.setTotal(2);
         when(pluginMapper.selectPage(any(), any())).thenReturn(mockPage);
 
-        PageResult<AlgorithmPlugin> result = algorithmPluginService.listPlugins(1, 10, null, "ACTIVE");
+        PageResult<AlgorithmPluginDetail> result = algorithmPluginService.listPlugins(1, 10, null, "ACTIVE");
 
         assertThat(result.getTotal()).isEqualTo(2);
         verify(pluginMapper).selectPage(any(Page.class), any(LambdaQueryWrapper.class));
@@ -114,7 +115,7 @@ class AlarmRuleServiceTest {
         emptyPage.setTotal(0);
         when(pluginMapper.selectPage(any(), any())).thenReturn(emptyPage);
 
-        PageResult<AlgorithmPlugin> result = algorithmPluginService.listPlugins(1, 10, "measurement", null);
+        PageResult<AlgorithmPluginDetail> result = algorithmPluginService.listPlugins(1, 10, "measurement", null);
 
         assertThat(result.getTotal()).isEqualTo(0);
         assertThat(result.getItems()).isEmpty();
@@ -127,10 +128,10 @@ class AlarmRuleServiceTest {
     void getPlugin_found_returnsPlugin() {
         when(pluginMapper.selectOne(any())).thenReturn(detectPlugin);
 
-        AlgorithmPlugin result = algorithmPluginService.getPlugin("ATOM-DETECT-YOLO-V1");
+        AlgorithmPluginDetail result = algorithmPluginService.getPlugin("ATOM-DETECT-YOLO-V1");
 
-        assertThat(result.getPluginId()).isEqualTo("ATOM-DETECT-YOLO-V1");
-        assertThat(result.getPluginType()).isEqualTo("detection");
+        assertThat(result.pluginId()).isEqualTo("ATOM-DETECT-YOLO-V1");
+        assertThat(result.pluginType()).isEqualTo("detection");
     }
 
     @Test

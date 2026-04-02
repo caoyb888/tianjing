@@ -14,23 +14,92 @@ import java.time.OffsetDateTime;
 @TableName("model_version")
 public class ModelVersion {
     @TableId(type = IdType.AUTO) private Long id;
-    private String modelVersionId;
+
+    /** DB列名 version_id */
+    @TableField("version_id")
+    private String versionId;
+
+    @TableField("plugin_id")
     private String pluginId;
-    private String version;
-    private String trainingJobId;
+
+    /** DB列名 train_job_id */
+    @TableField("train_job_id")
+    private String trainJobId;
+
+    @TableField("mlflow_run_id")
     private String mlflowRunId;
-    private String modelArtifactUrl;
-    private String map50;
-    private String map5095;
-    private Double inferMsGpu;
-    private Double inferMsCpu;
+
+    @TableField("mlflow_model_uri")
+    private String mlflowModelUri;
+
+    /** DB列名 model_path */
+    @TableField("model_path")
+    private String modelPath;
+
+    @TableField("export_format")
+    private String exportFormat;
+
+    @TableField("map50")
+    private Double map50;
+
+    /** DB列名 map50_95 */
+    @TableField("map50_95")
+    private Double map5095;
+
+    @TableField("precision_score")
+    private Double precisionScore;
+
+    @TableField("recall_score")
+    private Double recallScore;
+
+    /** DB列名 inference_ms_gpu */
+    @TableField("inference_ms_gpu")
+    private Double inferenceMs_gpu;
+
+    /** DB列名 inference_ms_cpu */
+    @TableField("inference_ms_cpu")
+    private Double inferenceMs_cpu;
+
+    @TableField("model_size_mb")
+    private Double modelSizeMb;
+
     /** 状态机：STAGING / SANDBOX_VALIDATING / REVIEWING / PRODUCTION / DEPRECATED */
+    @TableField("status")
     private String status;
-    private String submittedBy;
-    private String reviewedBy;
-    private String reviewComment;
-    private OffsetDateTime reviewedAt;
-    @TableField(fill = FieldFill.INSERT) private OffsetDateTime createdAt;
-    @TableField(fill = FieldFill.INSERT_UPDATE) private OffsetDateTime updatedAt;
+
+    @TableField("sandbox_hours")
+    private Integer sandboxHours;
+
+    @TableField("sandbox_precision")
+    private Double sandboxPrecision;
+
+    @TableField("sandbox_recall")
+    private Double sandboxRecall;
+
+    @TableField("approved_by")
+    private String approvedBy;
+
+    @TableField("approved_at")
+    private OffsetDateTime approvedAt;
+
+    @TableField("deployed_at")
+    private OffsetDateTime deployedAt;
+
+    @TableField("deprecated_at")
+    private OffsetDateTime deprecatedAt;
+
+    @TableLogic
+    private Boolean isDeleted;
+
+    @TableField(value = "created_at", fill = FieldFill.INSERT) private OffsetDateTime createdAt;
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE) private OffsetDateTime updatedAt;
+
+    @TableField("created_by")
     private String createdBy;
+
+    @TableField("updated_by")
+    private String updatedBy;
+
+    @Version
+    private Integer version;
 }
