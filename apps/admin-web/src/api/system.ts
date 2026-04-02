@@ -17,5 +17,5 @@ export const systemApi = {
     action?: string
     startTime?: string
     endTime?: string
-  }) => request.get('/system/logs', { params }),
+  }) => request.get('/system/operation-logs', { params }),
 }

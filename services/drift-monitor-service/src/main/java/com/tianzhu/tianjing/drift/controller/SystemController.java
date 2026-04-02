@@ -82,12 +82,16 @@ public class SystemController {
     public ApiResponse<PageResult<SysOperationLog>> listOperationLogs(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String operator_username,
-            @RequestParam(required = false) String operation_type) {
+            @RequestParam(required = false) String operator,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime) {
         Page<SysOperationLog> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<SysOperationLog> wrapper = new LambdaQueryWrapper<SysOperationLog>()
-                .eq(operator_username != null, SysOperationLog::getOperator, operator_username)
-                .eq(operation_type != null, SysOperationLog::getOperation, operation_type)
+                .eq(operator != null, SysOperationLog::getOperator, operator)
+                .eq(action != null, SysOperationLog::getOperation, action)
+                .ge(startTime != null, SysOperationLog::getOperatedAt, startTime)
+                .le(endTime != null, SysOperationLog::getOperatedAt, endTime)
                 .orderByDesc(SysOperationLog::getOperatedAt);
         var result = operationLogMapper.selectPage(pageParam, wrapper);
         return ApiResponse.page(PageResult.of(result.getTotal(), page, size, result.getRecords()));
