@@ -5,8 +5,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tianzhu.tianjing.common.response.ApiResponse;
 import com.tianzhu.tianjing.common.response.PageResult;
 import com.tianzhu.tianjing.common.security.TianjingUserDetails;
+import com.tianzhu.tianjing.drift.domain.Dataset;
 import com.tianzhu.tianjing.drift.domain.TrainJob;
+import com.tianzhu.tianjing.drift.dto.DatasetDTO;
 import com.tianzhu.tianjing.drift.dto.TrainJobRequest;
+import com.tianzhu.tianjing.drift.repository.DatasetMapper;
 import com.tianzhu.tianjing.drift.repository.TrainJobMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.exception.ErrorCode;
@@ -32,6 +35,7 @@ import java.util.UUID;
 public class TrainingController {
 
     private final TrainJobMapper trainJobMapper;
+    private final DatasetMapper datasetMapper;
 
     @GetMapping("/jobs")
     public ApiResponse<PageResult<TrainJob>> listJobs(
@@ -101,21 +105,31 @@ public class TrainingController {
     }
 
     @GetMapping("/datasets")
-    public ApiResponse<PageResult<Object>> listDatasets(
+    public ApiResponse<PageResult<DatasetDTO>> listDatasets(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        // 数据集列表从 tianjing_train 库读取（Sprint 3 完善，此处返回空）
-        return ApiResponse.page(PageResult.of(0, page, size, java.util.List.of()));
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String factory,
+            @RequestParam(required = false) String keyword) {
+        Page<Dataset> pageParam = new Page<>(page, size);
+        LambdaQueryWrapper<Dataset> wrapper = new LambdaQueryWrapper<Dataset>()
+                .eq(Dataset::getIsDeleted, false)
+                .eq(factory != null, Dataset::getFactoryCode, factory)
+                .like(keyword != null, Dataset::getDatasetName, keyword)
+                .orderByDesc(Dataset::getCreatedAt);
+        var result = datasetMapper.selectPage(pageParam, wrapper);
+        var items = result.getRecords().stream()
+                .map(d -> DatasetDTO.of(d, datasetMapper.selectVersionTags(d.getDatasetCode())))
+                .toList();
+        return ApiResponse.page(PageResult.of(result.getTotal(), page, size, items));
     }
 
-    /** GET /training/datasets/{dataset_code} — 数据集详情（接口 #45） */
     @GetMapping("/datasets/{dataset_code}")
-    public ApiResponse<Object> getDataset(@PathVariable("dataset_code") String datasetCode) {
-        // Sprint 3 完善具体实现；当前返回占位数据（tianjing_train 库数据集版本管理）
-        return ApiResponse.ok(java.util.Map.of(
-                "dataset_code", datasetCode,
-                "status", "PLACEHOLDER",
-                "message", "数据集详情 Sprint 3 完善（需 tianjing_train 库数据集版本表）"
-        ));
+    public ApiResponse<DatasetDTO> getDataset(@PathVariable("dataset_code") String datasetCode) {
+        Dataset dataset = datasetMapper.selectOne(new LambdaQueryWrapper<Dataset>()
+                .eq(Dataset::getDatasetCode, datasetCode)
+                .eq(Dataset::getIsDeleted, false));
+        if (dataset == null) throw BusinessException.notFound(ErrorCode.SCENE_NOT_FOUND);
+        var versions = datasetMapper.selectVersionTags(datasetCode);
+        return ApiResponse.ok(DatasetDTO.of(dataset, versions));
     }
 }
