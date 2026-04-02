@@ -1,4 +1,4 @@
-package com.tianzhu.tianjing.algomodel.config;
+package com.tianzhu.tianjing.replay.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * MyBatis-Plus 配置：分页插件 + 乐观锁插件
- * AlgorithmPlugin / ModelVersion 使用 @Version 乐观锁，必须注册 OptimisticLockerInnerInterceptor
+ * SimulationTask 使用 @Version 乐观锁，必须注册 OptimisticLockerInnerInterceptor
  */
 @Configuration
 public class MybatisPlusConfig {
