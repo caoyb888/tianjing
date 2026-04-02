@@ -34,7 +34,7 @@ public class AuditController {
         Page<DataSyncAudit> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<DataSyncAudit> wrapper = new LambdaQueryWrapper<DataSyncAudit>()
                 .eq(status != null, DataSyncAudit::getSyncStatus, status)
-                .orderByDesc(DataSyncAudit::getCreatedAt);
+                .orderByDesc(DataSyncAudit::getSyncedAt);
         var result = auditMapper.selectPage(pageParam, wrapper);
         return ApiResponse.page(PageResult.of(result.getTotal(), page, size, result.getRecords()));
     }
