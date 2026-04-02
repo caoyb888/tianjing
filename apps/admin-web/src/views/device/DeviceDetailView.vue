@@ -4,6 +4,7 @@
       <template #actions>
         <el-button @click="$router.back()">返回</el-button>
         <el-button @click="$router.push(`/devices/${deviceCode}/health`)">健康历史</el-button>
+        <el-button type="primary" @click="$router.push(`/devices/${deviceCode}/edit`)">编辑</el-button>
       </template>
     </PageHeader>
 

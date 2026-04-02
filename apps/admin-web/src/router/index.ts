@@ -83,6 +83,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '设备详情' },
       },
       {
+        path: 'devices/:deviceCode/edit',
+        name: 'DeviceEdit',
+        component: () => import('@/views/device/DeviceFormView.vue'),
+        meta: { title: '编辑设备', roles: [UserRole.ADMIN, UserRole.SCENE_EDITOR] },
+      },
+      {
         path: 'devices/:deviceCode/health',
         name: 'DeviceHealth',
         component: () => import('@/views/device/DeviceHealthView.vue'),

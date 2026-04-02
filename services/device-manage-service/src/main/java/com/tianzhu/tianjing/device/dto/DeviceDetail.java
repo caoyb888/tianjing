@@ -70,11 +70,22 @@ public record DeviceDetail(
         };
     }
 
-    /** 从场景 ID 推断厂部代码，如 SCENE-PELLET-001 → PELLET */
+    /**
+     * 从场景 ID 推断厂部代码，映射为前端 Factory enum 值（小写）
+     * SCENE-PELLET-* → pellet, SCENE-SINTER-* → sintering,
+     * SCENE-STEEL-* → steel, SCENE-SECTION-* → section, SCENE-STRIP-* → strip
+     */
     private static String extractFactory(String sceneId) {
         if (sceneId == null) return null;
-        // 格式：SCENE-{FACTORY}-{序号}
         String[] parts = sceneId.split("-");
-        return parts.length >= 2 ? parts[1] : null;
+        if (parts.length < 2) return null;
+        return switch (parts[1].toUpperCase()) {
+            case "PELLET"  -> "pellet";
+            case "SINTER"  -> "sintering";
+            case "STEEL"   -> "steel";
+            case "SECTION" -> "section";
+            case "STRIP"   -> "strip";
+            default        -> parts[1].toLowerCase();
+        };
     }
 }

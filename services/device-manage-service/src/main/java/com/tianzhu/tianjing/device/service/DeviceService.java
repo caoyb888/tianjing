@@ -39,16 +39,50 @@ public class DeviceService {
     @Value("${tianjing.security.aes-key:}")
     private String aesKey;
 
-    public PageResult<DeviceDetail> listDevices(int page, int size, String sceneId, String healthStatus) {
+    public PageResult<DeviceDetail> listDevices(int page, int size,
+                                                String sceneId, String healthStatus,
+                                                String factory, String status, String keyword) {
         Page<CameraDevice> pageParam = new Page<>(page, size);
+        // factory → scene_id 前缀（pellet→SCENE-PELLET, sintering→SCENE-SINTER, ...）
+        String scenePrefix = factoryToScenePrefix(factory);
+        // status (online/offline/warning) → DB health_status
+        String dbStatus = uiStatusToDb(status);
+
         LambdaQueryWrapper<CameraDevice> wrapper = new LambdaQueryWrapper<CameraDevice>()
                 .eq(StringUtils.isNotBlank(sceneId), CameraDevice::getSceneId, sceneId)
-                .eq(StringUtils.isNotBlank(healthStatus), CameraDevice::getHealthStatus, healthStatus)
+                .eq(StringUtils.isNotBlank(dbStatus), CameraDevice::getHealthStatus, dbStatus)
+                .likeRight(StringUtils.isNotBlank(scenePrefix), CameraDevice::getSceneId, scenePrefix)
+                .and(StringUtils.isNotBlank(keyword), w -> w
+                        .like(CameraDevice::getDeviceName, keyword)
+                        .or().like(CameraDevice::getDeviceCode, keyword)
+                        .or().like(CameraDevice::getIpAddress, keyword))
                 .orderByDesc(CameraDevice::getCreatedAt);
 
         var result = deviceMapper.selectPage(pageParam, wrapper);
         List<DeviceDetail> items = result.getRecords().stream().map(DeviceDetail::from).toList();
         return PageResult.of(result.getTotal(), page, size, items);
+    }
+
+    private static String factoryToScenePrefix(String factory) {
+        if (StringUtils.isBlank(factory)) return null;
+        return switch (factory.toLowerCase()) {
+            case "pellet"    -> "SCENE-PELLET";
+            case "sintering" -> "SCENE-SINTER";
+            case "steel"     -> "SCENE-STEEL";
+            case "section"   -> "SCENE-SECTION";
+            case "strip"     -> "SCENE-STRIP";
+            default          -> null;
+        };
+    }
+
+    private static String uiStatusToDb(String uiStatus) {
+        if (StringUtils.isBlank(uiStatus)) return null;
+        return switch (uiStatus.toLowerCase()) {
+            case "online"  -> "HEALTHY";
+            case "offline" -> "OFFLINE";
+            case "warning" -> "DEGRADED";
+            default        -> null;
+        };
     }
 
     public DeviceDetail getDevice(String deviceCode) {
@@ -100,12 +134,22 @@ public class DeviceService {
     @Transactional
     public DeviceDetail updateDevice(String deviceCode, DeviceRegisterRequest request, String operator) {
         CameraDevice device = findOrThrow(deviceCode);
-        if (request.deviceName() != null) device.setDeviceName(request.deviceName());
-        if (request.locationDesc() != null) device.setLocationDesc(request.locationDesc());
-        if (request.firmwareVersion() != null) device.setFirmwareVersion(request.firmwareVersion());
+        if (StringUtils.isNotBlank(request.deviceName()))     device.setDeviceName(request.deviceName());
+        if (StringUtils.isNotBlank(request.sceneId()))        device.setSceneId(request.sceneId());
+        if (StringUtils.isNotBlank(request.ipAddress()))      device.setIpAddress(request.ipAddress());
+        if (StringUtils.isNotBlank(request.macAddress()))     device.setMacAddress(request.macAddress());
+        if (StringUtils.isNotBlank(request.vendor()))         device.setVendor(request.vendor());
+        if (StringUtils.isNotBlank(request.firmwareVersion())) device.setFirmwareVersion(request.firmwareVersion());
+        if (StringUtils.isNotBlank(request.protocol()))       device.setProtocol(request.protocol());
+        if (request.resolutionWidth() != null)                device.setResolutionWidth(request.resolutionWidth());
+        if (request.resolutionHeight() != null)               device.setResolutionHeight(request.resolutionHeight());
+        if (request.fps() != null)                            device.setFps(request.fps());
+        if (request.locationDesc() != null)                   device.setLocationDesc(request.locationDesc());
+        if (request.isSupplementLight() != null)              device.setIsSupplementLight(request.isSupplementLight());
         if (StringUtils.isNotBlank(request.rtspUrl()) && StringUtils.isNotBlank(aesKey)) {
             device.setRtspUrl(AesEncryptUtil.encrypt(request.rtspUrl(), aesKey));
         }
+        device.setUpdatedBy(operator);
         deviceMapper.updateById(device);
         log.info("更新设备信息 device_code={} operator={}", deviceCode, operator);
         return DeviceDetail.from(device);

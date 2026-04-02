@@ -33,8 +33,11 @@ public class DeviceController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String scene_id,
-            @RequestParam(required = false) String health_status) {
-        return ApiResponse.page(deviceService.listDevices(page, size, scene_id, health_status));
+            @RequestParam(required = false) String health_status,
+            @RequestParam(required = false) String factory,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.page(deviceService.listDevices(page, size, scene_id, health_status, factory, status, keyword));
     }
 
     /**
@@ -81,8 +84,9 @@ public class DeviceController {
 
     /**
      * GET /devices/{device_code}/health — 设备健康检测历史（接口 #17）
+     * 别名 /health-history 与前端 deviceApi.getHealthHistory 路径对齐
      */
-    @GetMapping("/{device_code}/health")
+    @GetMapping({"/{device_code}/health", "/{device_code}/health-history"})
     public ApiResponse<PageResult<CameraHealthRecord>> getHealthHistory(
             @PathVariable("device_code") String deviceCode,
             @RequestParam(defaultValue = "1") int page,
