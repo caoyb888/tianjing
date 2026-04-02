@@ -39,6 +39,9 @@ export TIANJING_POSTGRES_PROD_PASSWORD=prod_user_dev_2024
 export TIANJING_POSTGRES_SANDBOX_URL=jdbc:postgresql://localhost:5432/tianjing_sandbox
 export TIANJING_POSTGRES_SANDBOX_USER=tianjing_sandbox_user
 export TIANJING_POSTGRES_SANDBOX_PASSWORD=sandbox_user_dev_2024
+export TIANJING_POSTGRES_TRAIN_URL=jdbc:postgresql://localhost:5432/tianjing_train
+export TIANJING_POSTGRES_TRAIN_USER=tianjing_train_user
+export TIANJING_POSTGRES_TRAIN_PASSWORD=train_user_dev_2024
 
 # lowcode-workflow-service 使用不同的 PG 环境变量名
 export TIANJING_POSTGRES_USERNAME=tianjing_prod_user

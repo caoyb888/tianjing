@@ -5,10 +5,20 @@ spring:
   application:
     name: drift-monitor-service
   datasource:
-    url: ${TIANJING_POSTGRES_PROD_URL:jdbc:postgresql://localhost:5432/tianjing_prod}
-    username: ${TIANJING_POSTGRES_PROD_USER:tianjing_app}
-    password: ${TIANJING_POSTGRES_PROD_PASSWORD}
-    driver-class-name: org.postgresql.Driver
+    dynamic:
+      primary: prod
+      strict: false
+      datasource:
+        prod:
+          url: ${TIANJING_POSTGRES_PROD_URL:jdbc:postgresql://localhost:5432/tianjing_prod}
+          username: ${TIANJING_POSTGRES_PROD_USER:tianjing_prod_user}
+          password: ${TIANJING_POSTGRES_PROD_PASSWORD}
+          driver-class-name: org.postgresql.Driver
+        train:
+          url: ${TIANJING_POSTGRES_TRAIN_URL:jdbc:postgresql://localhost:5432/tianjing_train}
+          username: ${TIANJING_POSTGRES_TRAIN_USER:tianjing_train_user}
+          password: ${TIANJING_POSTGRES_TRAIN_PASSWORD}
+          driver-class-name: org.postgresql.Driver
   data:
     redis:
       host: ${TIANJING_REDIS_HOST:localhost}
