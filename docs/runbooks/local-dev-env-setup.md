@@ -2,7 +2,7 @@
 
 > **适用场景**：单机 Docker Compose 本地开发 / 功能演示
 > **不适用**：生产环境（生产环境使用 Kubernetes，见 `deploy/helm/`）
-> **更新日期**：2026-04-01
+> **更新日期**：2026-04-03
 
 ---
 
@@ -20,19 +20,18 @@
 
 ### 1.2 CPU 指令集要求
 
-> ⚠ **当前开发机特别说明（Intel Core 2 Duo T7700）**
+> **当前开发机（Intel Core Processor Haswell，KVM 虚拟化，16 vCPU）**
 >
-> 本机 CPU 仅支持 SSE / SSE2 / SSE3 / SSSE3 / SSE4.2，**不支持 AVX / AVX2 / AVX512 / AES-NI**。
-> 这导致部分官方镜像无法运行，`deploy/docker/docker-compose.yml` 已对应调整。
-> **待更换硬件后需将下表中的镜像版本回滚至标准版本。**
+> 本机 CPU 支持 SSE / SSE2 / SSE3 / SSSE3 / SSE4.1 / SSE4.2 / **AVX / AVX2 / AES-NI** / POPCNT / BMI1 / BMI2 / FMA，**不支持 AVX-512**。
+> 所有官方标准镜像均可正常运行，`deploy/docker/docker-compose.yml` 使用标准版本。
 
-| 服务 | 标准版本（生产 / 新机器） | 当前开发机使用版本 | 原因 |
-|------|------------------------|-----------------|------|
-| MinIO | `RELEASE.2024+` | `RELEASE.2023-03-20T20-16-18Z` | 2024+ 版本 Go 编译启用 AVX2 |
-| minio/mc | `latest` | 替换为 `python:3.11-alpine` | `mc:latest` 依赖 glibc x86-64-v2（需 POPCNT+SSE4.1） |
-| Elasticsearch | `8.x` | **已移除** | 8.x 强依赖 AVX 指令，启动即崩溃 |
-| Kafka | `bitnami/kafka:3.6` | `confluentinc/cp-kafka:7.6.0` | bitnami 镜像国内不可用（非 CPU 问题） |
-| Nacos | `nacos/nacos-server:v2.3.2` | `v2.4.3` | v2.3.2 国内镜像不可用（非 CPU 问题，API 兼容） |
+| 服务 | 使用版本 | 说明 |
+|------|---------|------|
+| MinIO | `RELEASE.2024-11-07T00-52-20Z` | 标准版，AVX2 已满足 ✅ |
+| minio/mc | `latest` | 标准版，POPCNT+SSE4.1 已满足 ✅ |
+| Elasticsearch | `8.13.4`（可选，见 compose 注释块） | AVX 已满足，按需启用 ✅ |
+| Kafka | `confluentinc/cp-kafka:7.6.0` | bitnami 国内不可用，使用 Confluent（非 CPU 问题） |
+| Nacos | `nacos/nacos-server:v2.4.3` | v2.3.2 国内镜像不可用，使用 v2.4.3（API 兼容，非 CPU 问题） |
 
 ---
 
@@ -95,7 +94,7 @@ docker compose ps
 ## 3. 日常启动 / 停止命令
 
 ```bash
-cd /home/laigang/tianjing/deploy/docker
+cd /home/xintong/tianjing/deploy/docker
 
 # 启动所有服务
 docker compose up -d
@@ -155,22 +154,10 @@ docker ps --format "table {{.Names}}\t{{.Ports}}"
 docker stop asset-nacos asset-redis asset-mysql-tmp
 ```
 
-### 升级服务器后恢复标准镜像
+### Elasticsearch 告警日志全文检索（可选）
 
-更换支持 AVX2 的 CPU 后，修改 `deploy/docker/docker-compose.yml`：
-
-```yaml
-# MinIO 恢复官方最新版
-minio:
-  image: minio/minio:RELEASE.2024-xx-xxTxx-xx-xxZ
-
-# MinIO 初始化恢复 mc
-minio-init:
-  image: minio/mc:latest
-  # 恢复原 mc alias / mb 命令，移除 python 脚本
-
-# Elasticsearch 可重新加入（如需告警日志全文检索）
-```
+当前 CPU 已支持 AVX 指令，Elasticsearch 8.x 可正常运行。如需启用告警日志全文检索，
+取消 `deploy/docker/docker-compose.yml` 末尾 Elasticsearch 注释块，并在 `volumes` 块中添加 `es-data:` 卷。
 
 ---
 

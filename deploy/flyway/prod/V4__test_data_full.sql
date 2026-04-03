@@ -485,23 +485,23 @@ INSERT INTO camera_device (
     rtsp_url, health_status, created_by, updated_by
 ) VALUES
 -- 球团厂
-('CAM-PELLET-001', 'SCENE-PELLET-001', '链篦机1#侧板检测相机',  '192.168.10.11', 'A0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.7.2_220929', 'RTSP', 1920, 1080, '{RTSP_URL_PELLET_001}', 'ONLINE',  'test_admin', 'test_admin'),
-('CAM-PELLET-002', 'SCENE-PELLET-002', '链篦机分料器状态相机',   '192.168.10.12', 'A0:B1:C2:D3:E4:02', 'HIKVISION', 'V5.7.2_220929', 'RTSP', 1920, 1080, '{RTSP_URL_PELLET_002}', 'ONLINE',  'test_admin', 'test_admin'),
+('CAM-PELLET-001', 'SCENE-PELLET-001', '链篦机1#侧板检测相机',  '192.168.10.11', 'A0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.7.2_220929', 'RTSP', 1920, 1080, '{RTSP_URL_PELLET_001}', 'HEALTHY',  'test_admin', 'test_admin'),
+('CAM-PELLET-002', 'SCENE-PELLET-002', '链篦机分料器状态相机',   '192.168.10.12', 'A0:B1:C2:D3:E4:02', 'HIKVISION', 'V5.7.2_220929', 'RTSP', 1920, 1080, '{RTSP_URL_PELLET_002}', 'HEALTHY',  'test_admin', 'test_admin'),
 ('CAM-PELLET-003', 'SCENE-PELLET-003', '成一皮带料面检测相机',   '192.168.10.13', 'A0:B1:C2:D3:E4:03', 'DAHUA',    'V2.8.1_210630', 'RTSP', 1920, 1080, '{RTSP_URL_PELLET_003}', 'OFFLINE', 'test_admin', 'test_admin'),
 -- 烧结厂
-('CAM-SINTER-001', 'SCENE-SINTER-001', '烧结机1#壁条检测相机',  '192.168.20.11', 'B0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.7.5_230315', 'RTSP', 1920, 1080, '{RTSP_URL_SINTER_001}', 'ONLINE',  'test_admin', 'test_admin'),
-('CAM-SINTER-002', 'SCENE-SINTER-002', '台车篦条检测相机',       '192.168.20.12', 'B0:B1:C2:D3:E4:02', 'HIKVISION', 'V5.7.5_230315', 'RTSP', 1920, 1080, '{RTSP_URL_SINTER_002}', 'ONLINE',  'test_admin', 'test_admin'),
-('CAM-SINTER-003', 'SCENE-SINTER-FIRE-001', '点火炉看火相机',   '192.168.20.13', 'B0:B1:C2:D3:E4:03', 'DAHUA',    'V2.9.0_230801', 'RTSP', 1920, 1080, '{RTSP_URL_SINTER_FIRE}', 'ONLINE', 'test_admin', 'test_admin'),
+('CAM-SINTER-001', 'SCENE-SINTER-001', '烧结机1#壁条检测相机',  '192.168.20.11', 'B0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.7.5_230315', 'RTSP', 1920, 1080, '{RTSP_URL_SINTER_001}', 'HEALTHY',  'test_admin', 'test_admin'),
+('CAM-SINTER-002', 'SCENE-SINTER-002', '台车篦条检测相机',       '192.168.20.12', 'B0:B1:C2:D3:E4:02', 'HIKVISION', 'V5.7.5_230315', 'RTSP', 1920, 1080, '{RTSP_URL_SINTER_002}', 'HEALTHY',  'test_admin', 'test_admin'),
+('CAM-SINTER-003', 'SCENE-SINTER-FIRE-001', '点火炉看火相机',   '192.168.20.13', 'B0:B1:C2:D3:E4:03', 'DAHUA',    'V2.9.0_230801', 'RTSP', 1920, 1080, '{RTSP_URL_SINTER_FIRE}', 'HEALTHY', 'test_admin', 'test_admin'),
 ('CAM-SINTER-004', 'SCENE-SINTER-003', '台车点火料面相机',       '192.168.20.14', 'B0:B1:C2:D3:E4:04', 'DAHUA',    'V2.9.0_230801', 'RTSP', 1920, 1080, '{RTSP_URL_SINTER_003}', 'OFFLINE', 'test_admin', 'test_admin'),
 ('CAM-SINTER-005', 'SCENE-SINTER-004', '白灰仓粒度检测相机',     '192.168.20.15', 'B0:B1:C2:D3:E4:05', 'UNIVIEW',  'V3.1.0_231201', 'RTSP', 1920, 1080, '{RTSP_URL_SINTER_004}', 'OFFLINE', 'test_admin', 'test_admin'),
 -- 炼钢厂
-('CAM-STEEL-001',  'SCENE-STEEL-001',  '连铸1#铸坯表面检测相机', '192.168.30.11', 'C0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.8.0_231010', 'RTSP', 1920, 1080, '{RTSP_URL_STEEL_001}',  'ONLINE',  'test_admin', 'test_admin'),
+('CAM-STEEL-001',  'SCENE-STEEL-001',  '连铸1#铸坯表面检测相机', '192.168.30.11', 'C0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.8.0_231010', 'RTSP', 1920, 1080, '{RTSP_URL_STEEL_001}',  'HEALTHY',  'test_admin', 'test_admin'),
 ('CAM-STEEL-002',  'SCENE-STEEL-002',  '加热炉铸坯质量相机',     '192.168.30.12', 'C0:B1:C2:D3:E4:02', 'HIKVISION', 'V5.8.0_231010', 'RTSP', 1920, 1080, '{RTSP_URL_STEEL_002}',  'OFFLINE', 'test_admin', 'test_admin'),
 ('CAM-STEEL-003',  'SCENE-STEEL-003',  '转炉溅渣密度相机',       '192.168.30.13', 'C0:B1:C2:D3:E4:03', 'DAHUA',    'V2.8.1_210630', 'RTSP', 1920, 1080, '{RTSP_URL_STEEL_003}',  'OFFLINE', 'test_admin', 'test_admin'),
 ('CAM-STEEL-004',  'SCENE-STEEL-004',  '吹氩站底吹检测相机',     '192.168.30.14', 'C0:B1:C2:D3:E4:04', 'DAHUA',    'V2.8.1_210630', 'RTSP', 1920, 1080, '{RTSP_URL_STEEL_004}',  'OFFLINE', 'test_admin', 'test_admin'),
 -- 型钢厂
-('CAM-SECTION-001','SCENE-SECTION-001','冷床入口质量检测相机',   '192.168.40.11', 'D0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.7.5_230315', 'RTSP', 1920, 1080, '{RTSP_URL_SECTION_001}','ONLINE',  'test_admin', 'test_admin'),
-('CAM-SECTION-002','SCENE-SECTION-002','冷床入口尺寸测量相机',   '192.168.40.12', 'D0:B1:C2:D3:E4:02', 'HIKVISION', 'V5.7.5_230315', 'RTSP', 1920, 1080, '{RTSP_URL_SECTION_002}','ONLINE',  'test_admin', 'test_admin'),
+('CAM-SECTION-001','SCENE-SECTION-001','冷床入口质量检测相机',   '192.168.40.11', 'D0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.7.5_230315', 'RTSP', 1920, 1080, '{RTSP_URL_SECTION_001}','HEALTHY',  'test_admin', 'test_admin'),
+('CAM-SECTION-002','SCENE-SECTION-002','冷床入口尺寸测量相机',   '192.168.40.12', 'D0:B1:C2:D3:E4:02', 'HIKVISION', 'V5.7.5_230315', 'RTSP', 1920, 1080, '{RTSP_URL_SECTION_002}','HEALTHY',  'test_admin', 'test_admin'),
 ('CAM-SECTION-003','SCENE-SECTION-003','检查台架质量检测相机',   '192.168.40.13', 'D0:B1:C2:D3:E4:03', 'UNIVIEW',  'V3.1.0_231201', 'RTSP', 1920, 1080, '{RTSP_URL_SECTION_003}','OFFLINE', 'test_admin', 'test_admin'),
 -- 带钢厂
 ('CAM-STRIP-001',  'SCENE-STRIP-001',  '带钢飞剪剪切检测相机',  '192.168.50.11', 'E0:B1:C2:D3:E4:01', 'HIKVISION', 'V5.8.0_231010', 'RTSP', 1920, 1080, '{RTSP_URL_STRIP_001}',  'OFFLINE', 'test_admin', 'test_admin'),
@@ -560,18 +560,18 @@ INSERT INTO calibration_record (
 -- PART 9：操作审计日志（初始化操作记录，用于审计查询测试）
 -- ============================================================
 INSERT INTO sys_operation_log (
-    operation, object_type, object_id, operator, result, trace_id, operated_at
+    log_id, operation, target_type, target_id, operator, trace_id, operated_at
 ) VALUES
-('SCENE_CREATE',  'SCENE_CONFIG', 'SCENE-STEEL-001',       'test_admin',        'SUCCESS', 'trace-init-0001', '2026-04-01 09:00:00+08'),
-('SCENE_ENABLE',  'SCENE_CONFIG', 'SCENE-STEEL-001',       'test_admin',        'SUCCESS', 'trace-init-0002', '2026-04-01 09:05:00+08'),
-('SCENE_CREATE',  'SCENE_CONFIG', 'SCENE-PELLET-001',      'test_admin',        'SUCCESS', 'trace-init-0003', '2026-04-01 09:10:00+08'),
-('SCENE_ENABLE',  'SCENE_CONFIG', 'SCENE-PELLET-001',      'test_admin',        'SUCCESS', 'trace-init-0004', '2026-04-01 09:15:00+08'),
-('SCENE_CREATE',  'SCENE_CONFIG', 'SCENE-SINTER-001',      'test_admin',        'SUCCESS', 'trace-init-0005', '2026-04-01 09:20:00+08'),
-('SCENE_ENABLE',  'SCENE_CONFIG', 'SCENE-SINTER-001',      'test_admin',        'SUCCESS', 'trace-init-0006', '2026-04-01 09:25:00+08'),
-('SCENE_CREATE',  'SCENE_CONFIG', 'SCENE-SECTION-001',     'test_admin',        'SUCCESS', 'trace-init-0007', '2026-04-01 09:30:00+08'),
-('SCENE_ENABLE',  'SCENE_CONFIG', 'SCENE-SECTION-001',     'test_admin',        'SUCCESS', 'trace-init-0008', '2026-04-01 09:35:00+08'),
-('SCENE_CREATE',  'SCENE_CONFIG', 'SCENE-SINTER-FIRE-001', 'test_scene_editor', 'SUCCESS', 'trace-init-0009', '2026-04-01 10:00:00+08'),
-('SCENE_ENABLE',  'SCENE_CONFIG', 'SCENE-SINTER-FIRE-001', 'test_scene_editor', 'SUCCESS', 'trace-init-0010', '2026-04-01 10:05:00+08'),
-('MODEL_DEPLOY',  'MODEL_VERSION','MV-BILLET-CRACK-20260320-001',  'test_reviewer_b', 'SUCCESS', 'trace-init-0011', '2026-04-01 10:30:00+08'),
-('MODEL_APPROVE', 'MODEL_VERSION','MV-WALLBAR-20260322-001',       'test_reviewer_b', 'SUCCESS', 'trace-init-0012', '2026-04-01 10:35:00+08'),
-('SANDBOX_PROMOTE', 'MODEL_VERSION','MV-MATERIAL-LEVEL-20260325-001', 'test_reviewer_b', 'SUCCESS', 'trace-init-0013', '2026-04-01 11:00:00+08');
+('LOG-INIT-0001', 'SCENE_CREATE',    'SCENE_CONFIG',  'SCENE-STEEL-001',                 'test_admin',        'trace-init-0001', '2026-04-01 09:00:00+08'),
+('LOG-INIT-0002', 'SCENE_ENABLE',    'SCENE_CONFIG',  'SCENE-STEEL-001',                 'test_admin',        'trace-init-0002', '2026-04-01 09:05:00+08'),
+('LOG-INIT-0003', 'SCENE_CREATE',    'SCENE_CONFIG',  'SCENE-PELLET-001',                'test_admin',        'trace-init-0003', '2026-04-01 09:10:00+08'),
+('LOG-INIT-0004', 'SCENE_ENABLE',    'SCENE_CONFIG',  'SCENE-PELLET-001',                'test_admin',        'trace-init-0004', '2026-04-01 09:15:00+08'),
+('LOG-INIT-0005', 'SCENE_CREATE',    'SCENE_CONFIG',  'SCENE-SINTER-001',                'test_admin',        'trace-init-0005', '2026-04-01 09:20:00+08'),
+('LOG-INIT-0006', 'SCENE_ENABLE',    'SCENE_CONFIG',  'SCENE-SINTER-001',                'test_admin',        'trace-init-0006', '2026-04-01 09:25:00+08'),
+('LOG-INIT-0007', 'SCENE_CREATE',    'SCENE_CONFIG',  'SCENE-SECTION-001',               'test_admin',        'trace-init-0007', '2026-04-01 09:30:00+08'),
+('LOG-INIT-0008', 'SCENE_ENABLE',    'SCENE_CONFIG',  'SCENE-SECTION-001',               'test_admin',        'trace-init-0008', '2026-04-01 09:35:00+08'),
+('LOG-INIT-0009', 'SCENE_CREATE',    'SCENE_CONFIG',  'SCENE-SINTER-FIRE-001',           'test_scene_editor', 'trace-init-0009', '2026-04-01 10:00:00+08'),
+('LOG-INIT-0010', 'SCENE_ENABLE',    'SCENE_CONFIG',  'SCENE-SINTER-FIRE-001',           'test_scene_editor', 'trace-init-0010', '2026-04-01 10:05:00+08'),
+('LOG-INIT-0011', 'MODEL_DEPLOY',    'MODEL_VERSION', 'MV-BILLET-CRACK-20260320-001',    'test_reviewer_b',   'trace-init-0011', '2026-04-01 10:30:00+08'),
+('LOG-INIT-0012', 'MODEL_APPROVE',   'MODEL_VERSION', 'MV-WALLBAR-20260322-001',         'test_reviewer_b',   'trace-init-0012', '2026-04-01 10:35:00+08'),
+('LOG-INIT-0013', 'SANDBOX_PROMOTE', 'MODEL_VERSION', 'MV-MATERIAL-LEVEL-20260325-001',  'test_reviewer_b',   'trace-init-0013', '2026-04-01 11:00:00+08');

@@ -3,16 +3,17 @@
 # Docker Compose  |  适用：单机本地开发、功能演示
 # =============================================================
 #
-# ⚠  CPU 兼容性说明（Intel Core 2 Duo T7700）
-#    支持：SSE / SSE2 / SSE3 / SSSE3 / SSE4.2
-#    不支持：AVX / AVX2 / AVX512 / AES-NI
+# CPU 兼容性说明（Intel Core Processor Haswell，KVM 虚拟化）
+#    支持：SSE / SSE2 / SSE3 / SSSE3 / SSE4.1 / SSE4.2 / AVX / AVX2 / AES-NI / POPCNT / BMI1 / BMI2 / FMA
+#    不支持：AVX-512
 #
-# 镜像选型影响：
-#   ❌ Elasticsearch 8.x   — 强依赖 AVX 指令，已从本文件移除
-#   ⚠  MinIO              — RELEASE.2024+ 启用 AVX2，降为 2023-09 稳定版
+# 镜像选型说明：
+#   ✅ Elasticsearch 8.x   — AVX 指令已满足，可选启用（见文件末尾注释块）
+#   ✅ MinIO RELEASE.2024+ — AVX2 已满足，使用标准版本
+#   ✅ minio/mc:latest     — POPCNT+SSE4.1 已满足，使用标准 mc
 #   ✅ PostgreSQL / Redis  — alpine 镜像，无 AVX 要求
 #   ✅ Kafka / Nacos       — JVM 运行，无 CPU 扩展指令依赖
-#   ✅ TDengine 3.x        — 运行时 SIMD 探测，SSE4.2 回退路径安全
+#   ✅ TDengine 3.x        — 运行时 SIMD 探测，自动启用 AVX2 路径
 #
 # 使用方法：
 #   cp .env.example .env
@@ -218,12 +219,10 @@ services:
       start_period: 60s
 
   # ── MinIO ──────────────────────────────────────────────────
-  # ⚠  RELEASE.2024+ 编译时启用 AVX2，当前 CPU 不支持
-  #    使用本地已有的 RELEASE.2023-03-20（Go 1.20，无 AVX2 强依赖）✅
-  #    项目要求 RELEASE.2024+，待升级 CPU/服务器后可换回
+  # RELEASE.2024+ 标准版，当前 CPU 支持 AVX2 ✅
   minio:
     <<: *common
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
     container_name: tianjing-minio
     ports:
       - "9000:9000"   # S3 API
@@ -242,10 +241,9 @@ services:
       start_period: 20s
 
   # ── MinIO Bucket 初始化（一次性任务）────────────────────────
-  # minio/mc:latest 基于 Ubuntu 22.04，glibc 要求 x86-64-v2（需 POPCNT+SSE4.1）
-  # 改用 python:3.11-alpine（musl libc，无 x86-64-v2 要求）✅
+  # 当前 CPU 支持 POPCNT+SSE4.1，minio/mc:latest 可正常运行 ✅
   minio-init:
-    image: python:3.11-alpine
+    image: minio/mc:latest
     container_name: tianjing-minio-init
     networks:
       - tianjing-net
@@ -254,17 +252,25 @@ services:
         condition: service_healthy
     restart: "no"
     environment:
-      MINIO_ENDPOINT: minio:9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - ./init/minio/create_buckets.py:/scripts/create_buckets.py:ro
     entrypoint:
       - sh
       - -c
       - |
-        pip install -q --index-url https://pypi.tuna.tsinghua.edu.cn/simple minio
-        python3 /scripts/create_buckets.py
+        mc alias set minio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}
+        for bucket in \
+          tianjing-frames-prod \
+          tianjing-frames-sandbox \
+          tianjing-models-prod \
+          tianjing-models-staging \
+          tianjing-datasets \
+          tianjing-exports \
+          tianjing-lab-video \
+          tianjing-sim-temp; do
+          mc mb --ignore-existing minio/$${bucket} && echo "  ready: $${bucket}"
+        done
+        echo ">>> MinIO Buckets 初始化完成"
 
   # ── TDengine 3.3.2.0 ──────────────────────────────────────
   # 运行时 SIMD 检测：AVX2 不可用时自动回退至 SSE4.2 ✅
@@ -314,3 +320,27 @@ services:
       - ../../scripts/tdengine-init.sql:/scripts/tdengine-init.sql:ro
       - ./init/tdengine/init_schema.py:/scripts/init_schema.py:ro
     entrypoint: ["python3", "/scripts/init_schema.py"]
+
+# =============================================================
+# 可选服务（告警日志全文检索，按需取消注释启用）
+# 当前 CPU 支持 AVX 指令，Elasticsearch 8.x 可正常运行 ✅
+# 启用后需同步在 volumes 块中添加 es-data 卷
+# =============================================================
+#  elasticsearch:
+#    <<: *common
+#    image: elasticsearch:8.13.4
+#    container_name: tianjing-elasticsearch
+#    ports:
+#      - "9200:9200"
+#    environment:
+#      discovery.type: single-node
+#      xpack.security.enabled: "false"
+#      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+#    volumes:
+#      - es-data:/usr/share/elasticsearch/data
+#    healthcheck:
+#      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"' || exit 1"]
+#      interval: 20s
+#      timeout: 10s
+#      retries: 15
+#      start_period: 90s
