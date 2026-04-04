@@ -66,7 +66,7 @@
       <el-table-column label="更新时间" width="170">
         <template #default="{ row }">{{ formatDateTime(row.updatedAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button link size="small" @click="$router.push(`/scenes/${row.sceneId}`)">详情</el-button>
           <el-button link size="small" @click="$router.push(`/scenes/${row.sceneId}/edit`)">编辑</el-button>
@@ -79,6 +79,7 @@
             {{ row.status === 'active' ? '停用' : '启用' }}
           </el-button>
           <el-button link size="small" @click="$router.push(`/scenes/${row.sceneId}/workflow`)">编排</el-button>
+          <el-button link size="small" type="info" @click="$router.push(`/calibration/${row.sceneId}`)">标定</el-button>
         </template>
       </el-table-column>
     </DataTable>

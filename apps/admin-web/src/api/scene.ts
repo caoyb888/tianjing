@@ -29,4 +29,7 @@ export const sceneApi = {
 
   rollback: (sceneId: string, data: { version: number }) =>
     request.post(`/scenes/${sceneId}/rollback`, data),
+
+  saveWorkflow: (sceneId: string, workflowJson: unknown) =>
+    request.put(`/scenes/${sceneId}/workflow`, { workflowJson }),
 }

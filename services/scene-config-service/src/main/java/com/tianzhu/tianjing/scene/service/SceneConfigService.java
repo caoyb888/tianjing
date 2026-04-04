@@ -12,6 +12,7 @@ import com.tianzhu.tianjing.scene.domain.SceneConfigHistory;
 import com.tianzhu.tianjing.scene.dto.RollbackRequest;
 import com.tianzhu.tianjing.scene.dto.SceneConfigDetail;
 import com.tianzhu.tianjing.scene.dto.SceneConfigRequest;
+import com.tianzhu.tianjing.scene.dto.WorkflowSaveRequest;
 import com.tianzhu.tianjing.scene.repository.SceneConfigHistoryMapper;
 import com.tianzhu.tianjing.scene.repository.SceneConfigMapper;
 import lombok.RequiredArgsConstructor;
@@ -261,6 +262,25 @@ public class SceneConfigService {
                 throw BusinessException.of(ErrorCode.PARAM_JSON_INVALID, "algo_params_json 格式错误");
             }
         }
+    }
+
+    // ==============================
+    // 保存算法编排工作流（独立端点，不触发乐观锁校验）
+    // ==============================
+
+    @Transactional
+    public SceneConfigDetail saveWorkflow(String sceneId, WorkflowSaveRequest request, String operator) {
+        SceneConfig scene = findActiveOrThrow(sceneId);
+        try {
+            scene.setWorkflowJson(objectMapper.writeValueAsString(request.workflowJson()));
+        } catch (Exception e) {
+            throw BusinessException.of(ErrorCode.PARAM_JSON_INVALID, "workflowJson 格式错误");
+        }
+        scene.setUpdatedBy(operator);
+        sceneMapper.updateById(scene);
+        writeHistory(scene, "WORKFLOW_UPDATE", "保存算法编排", operator);
+        log.info("保存工作流编排 scene_id={} operator={}", sceneId, operator);
+        return SceneConfigDetail.from(sceneMapper.selectById(scene.getId()));
     }
 
     // ==============================

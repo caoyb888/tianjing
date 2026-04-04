@@ -7,6 +7,7 @@ import com.tianzhu.tianjing.scene.domain.SceneConfigHistory;
 import com.tianzhu.tianjing.scene.dto.RollbackRequest;
 import com.tianzhu.tianjing.scene.dto.SceneConfigDetail;
 import com.tianzhu.tianjing.scene.dto.SceneConfigRequest;
+import com.tianzhu.tianjing.scene.dto.WorkflowSaveRequest;
 import com.tianzhu.tianjing.scene.service.SceneConfigService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -106,6 +107,18 @@ public class SceneConfigController {
             @PathVariable("scene_id") String sceneId,
             @AuthenticationPrincipal TianjingUserDetails user) {
         return ApiResponse.ok(sceneService.disableScene(sceneId, user.getUsername()));
+    }
+
+    /**
+     * PUT /scenes/{scene_id}/workflow — 保存算法编排工作流（独立端点）
+     */
+    @PutMapping("/{scene_id}/workflow")
+    @PreAuthorize("hasAnyRole('SCENE_EDITOR', 'ADMIN')")
+    public ApiResponse<SceneConfigDetail> saveWorkflow(
+            @PathVariable("scene_id") String sceneId,
+            @Valid @RequestBody WorkflowSaveRequest request,
+            @AuthenticationPrincipal TianjingUserDetails user) {
+        return ApiResponse.ok(sceneService.saveWorkflow(sceneId, request, user.getUsername()));
     }
 
     /**

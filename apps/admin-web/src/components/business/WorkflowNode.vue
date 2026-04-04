@@ -27,6 +27,7 @@ defineProps<{
 
 <style scoped lang="scss">
 .workflow-node {
+  position: relative;
   background: #fff;
   border: 2px solid;
   border-radius: 8px;

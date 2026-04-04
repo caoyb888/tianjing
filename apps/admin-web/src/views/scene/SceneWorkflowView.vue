@@ -38,6 +38,7 @@
           fit-view-on-init
           class="flow-canvas"
           @node-click="onNodeClick"
+          @connect="onConnect"
         >
           <Background pattern-color="#e0e0e0" :gap="20" />
           <Controls />
@@ -186,7 +187,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { VueFlow, useVueFlow } from '@vue-flow/core'
+import { VueFlow, useVueFlow, addEdge } from '@vue-flow/core'
+import type { Connection } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
@@ -278,6 +280,10 @@ function onDrop(event: DragEvent) {
   dragNodeType = ''
 }
 
+function onConnect(params: Connection) {
+  edges.value = addEdge(params, edges.value)
+}
+
 function onNodeClick({ node }: { node: Node }) {
   selectedNode.value = { ...node }
 }
@@ -296,29 +302,80 @@ function deleteSelectedNode() {
   selectedNode.value = null
 }
 
+/**
+ * 将历史格式节点（无 position/data）归一化为 VueFlow 格式。
+ * 旧格式：{ id, type, label, params: {...} }
+ * 新格式：{ id, type, position: {x,y}, data: { label, ...params } }
+ */
+function normalizeNodes(rawNodes: any[], edges: any[]): Node[] {
+  // 按 edge 连接顺序排列节点，自动分配从左到右的 x 坐标
+  const ordered: string[] = []
+  const edgeMap: Record<string, string> = {}
+  for (const e of edges) edgeMap[e.source] = e.target
+
+  // 找起点（无任何 edge 以它为 target）
+  const targets = new Set(edges.map((e: any) => e.target))
+  const start = rawNodes.find((n: any) => !targets.has(n.id))
+  if (start) {
+    let cur = start.id
+    while (cur) { ordered.push(cur); cur = edgeMap[cur] }
+  }
+  // 补上未被连线覆盖的节点
+  for (const n of rawNodes) if (!ordered.includes(n.id)) ordered.push(n.id)
+
+  const nodeMap = Object.fromEntries(rawNodes.map((n: any) => [n.id, n]))
+  return ordered.map((id, idx) => {
+    const raw = nodeMap[id]
+    // 已是 VueFlow 格式（有 position + data）则直接使用
+    if (raw.position && raw.data) return raw as Node
+    // 旧格式转换
+    const params = raw.params || {}
+    return {
+      id: raw.id,
+      type: raw.type,
+      position: raw.position ?? { x: 80 + idx * 220, y: 200 },
+      data: {
+        label: raw.label || raw.data?.label || raw.type,
+        device_code: params.device_code ?? '',
+        mirror_fps: params.fps ?? params.mirror_fps ?? 5,
+        preprocess_type: params.preprocess_type ?? 'dehaze',
+        plugin_id: params.plugin_id ?? raw.data?.plugin_id ?? '',
+        conf_threshold: params.conf_threshold ?? raw.data?.conf_threshold ?? 0.85,
+        condition: params.condition ?? 'confidence_threshold',
+        level: params.level ?? raw.data?.level ?? 'WARNING',
+        confirm_frames: params.confirm_frames ?? raw.data?.confirm_frames ?? 3,
+        retention_hours: params.retention_hours ?? 72,
+        topic: params.topic ?? `iiot/tianjing/alarm/${sceneId}`,
+      },
+    } as Node
+  })
+}
+
 async function loadWorkflow() {
   try {
     const res = await sceneApi.get(sceneId)
-    const workflowJson = (res.data.data as any).workflowJson
-    if (workflowJson) {
-      nodes.value = workflowJson.nodes || []
+    const workflowJson = (res.data.data as any)?.workflowJson
+    if (workflowJson && workflowJson.nodes?.length) {
       edges.value = workflowJson.edges || []
+      nodes.value = normalizeNodes(workflowJson.nodes, edges.value)
+    } else {
+      ElMessage.info('暂无编排配置，请从节点面板拖入节点开始编排')
     }
   } catch {
-    ElMessage.warning('暂无编排配置，请从节点面板拖入节点开始编排')
+    ElMessage.warning('加载编排配置失败')
   }
 }
 
 async function saveWorkflow() {
   saving.value = true
   try {
-    await sceneApi.update(sceneId, {
-      workflowJson: {
-        nodes: nodes.value,
-        edges: edges.value,
-      },
+    await sceneApi.saveWorkflow(sceneId, {
+      nodes: nodes.value,
+      edges: edges.value,
     })
     ElMessage.success('编排已保存')
+  } catch {
+    ElMessage.error('保存失败，请重试')
   } finally {
     saving.value = false
   }

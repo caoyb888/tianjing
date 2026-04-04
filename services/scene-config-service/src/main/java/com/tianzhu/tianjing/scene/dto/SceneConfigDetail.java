@@ -24,12 +24,23 @@ public record SceneConfigDetail(
         Integer frameInterval,
         @JsonProperty("alarmConfig") Object alarmConfigJson,
         @JsonProperty("algorithmConfig") Object algoParamsJson,
+        Object workflowJson,
         Integer version,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         String createdBy
 ) {
     public static SceneConfigDetail from(SceneConfig s) {
+        // workflow_json 存储为 JSON 字符串，反序列化为 Object 返回给前端
+        Object workflowObj = null;
+        if (s.getWorkflowJson() != null) {
+            try {
+                workflowObj = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .readValue(s.getWorkflowJson(), Object.class);
+            } catch (Exception ignored) {
+                workflowObj = s.getWorkflowJson();
+            }
+        }
         return new SceneConfigDetail(
                 s.getSceneId(), s.getSceneName(),
                 normalizeFactory(s.getFactoryCode()),
@@ -40,6 +51,7 @@ public record SceneConfigDetail(
                 s.getBoundDeviceCode(), s.getActiveModelVersionId(), s.getActivePluginId(),
                 s.getFrameInterval(),
                 s.getAlarmConfigJson(), s.getAlgoParamsJson(),
+                workflowObj,
                 s.getVersion(),
                 s.getCreatedAt(), s.getUpdatedAt(), s.getCreatedBy()
         );
