@@ -8,6 +8,7 @@ import com.tianzhu.tianjing.common.security.TianjingUserDetails;
 import com.tianzhu.tianjing.drift.domain.Dataset;
 import com.tianzhu.tianjing.drift.domain.TrainJob;
 import com.tianzhu.tianjing.drift.dto.DatasetDTO;
+import com.tianzhu.tianjing.drift.dto.DatasetVersionItem;
 import com.tianzhu.tianjing.drift.dto.TrainJobRequest;
 import com.tianzhu.tianjing.drift.repository.DatasetMapper;
 import com.tianzhu.tianjing.drift.repository.TrainJobMapper;
@@ -23,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * 训练管理接口
@@ -127,7 +129,7 @@ public class TrainingController {
         Page<Dataset> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<Dataset> wrapper = new LambdaQueryWrapper<Dataset>()
                 .eq(Dataset::getIsDeleted, false)
-                .eq(factory != null, Dataset::getFactoryCode, factory)
+                .eq(factory != null, Dataset::getFactoryCode, toDbFactoryCode(factory))
                 .like(keyword != null, Dataset::getDatasetName, keyword)
                 .orderByDesc(Dataset::getCreatedAt);
         var result = datasetMapper.selectPage(pageParam, wrapper);
@@ -135,6 +137,12 @@ public class TrainingController {
                 .map(d -> DatasetDTO.of(d, datasetMapper.selectVersionTags(d.getDatasetCode())))
                 .toList();
         return ApiResponse.page(PageResult.of(result.getTotal(), page, size, items));
+    }
+
+    /** 供提交训练作业表单下拉选择：返回全部可用数据集版本（含 version_id） */
+    @GetMapping("/dataset-versions")
+    public ApiResponse<List<DatasetVersionItem>> listDatasetVersions() {
+        return ApiResponse.ok(datasetMapper.selectAllVersions());
     }
 
     @GetMapping("/datasets/{dataset_code}")
@@ -145,5 +153,18 @@ public class TrainingController {
         if (dataset == null) throw BusinessException.notFound(ErrorCode.SCENE_NOT_FOUND);
         var versions = datasetMapper.selectVersionTags(datasetCode);
         return ApiResponse.ok(DatasetDTO.of(dataset, versions));
+    }
+
+    /** 前端 Factory 枚举值（小写）→ DB factory_code（大写），与 DatasetDTO.normalizeFactory 互为反向 */
+    private static String toDbFactoryCode(String frontendValue) {
+        if (frontendValue == null) return null;
+        return switch (frontendValue.toLowerCase()) {
+            case "pellet"    -> "PELLET";
+            case "sintering" -> "SINTER";
+            case "steel"     -> "STEEL";
+            case "section"   -> "SECTION";
+            case "strip"     -> "STRIP";
+            default          -> frontendValue.toUpperCase();
+        };
     }
 }

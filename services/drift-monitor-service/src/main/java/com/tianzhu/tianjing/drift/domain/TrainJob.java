@@ -26,7 +26,7 @@ public class TrainJob {
     @TableField("drift_metric_id")
     private String driftMetricId;
 
-    @TableField("train_config_json")
+    @TableField(value = "train_config_json", typeHandler = com.tianzhu.tianjing.drift.config.JsonbTypeHandler.class)
     private String trainConfigJson;
 
     @TableField("gpu_count")

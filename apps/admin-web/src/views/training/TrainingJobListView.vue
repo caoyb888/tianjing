@@ -42,10 +42,37 @@
     <el-dialog v-model="showSubmit" title="提交训练作业" width="520px">
       <el-form :model="submitForm" label-width="110px">
         <el-form-item label="插件 ID" required>
-          <el-input v-model="submitForm.pluginId" placeholder="如：ATOM-DETECT-YOLO-V1" />
+          <el-select
+            v-model="submitForm.pluginId"
+            placeholder="请选择算法插件"
+            style="width: 100%"
+            :loading="pluginsLoading"
+            filterable
+          >
+            <el-option
+              v-for="p in plugins"
+              :key="p.pluginId"
+              :value="p.pluginId"
+              :label="`${p.name}（${p.pluginId}）`"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="数据集版本 ID" required>
-          <el-input v-model="submitForm.datasetVersionId" placeholder="如：DS-SINTER-FIRE-001-v1.0" />
+        <el-form-item label="数据集版本" required>
+          <el-select
+            v-model="submitForm.datasetVersionId"
+            placeholder="请选择数据集版本"
+            style="width: 100%"
+            :loading="datasetVersionsLoading"
+            filterable
+          >
+            <el-option
+              v-for="v in datasetVersions"
+              :key="v.versionId"
+              :value="v.versionId"
+              :label="`${v.datasetCode} · ${v.versionTag}${v.isFrozen ? '（已冻结）' : ''}`"
+              :disabled="v.isFrozen"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="训练轮次">
           <el-input-number v-model="submitForm.epochs" :min="1" :max="300" style="width: 100%" />
@@ -64,15 +91,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { trainingApi } from '@/api/training'
+import { algorithmApi } from '@/api/algorithm'
 import { formatDateTime } from '@/utils/format'
-import type { TrainingJob } from '@/types'
+import type { TrainingJob, AlgorithmPlugin } from '@/types'
 
 const jobs = ref<TrainingJob[]>([])
 const total = ref(0)
@@ -81,6 +109,32 @@ const page = ref(1)
 const size = ref(20)
 const showSubmit = ref(false)
 const submitting = ref(false)
+const plugins = ref<AlgorithmPlugin[]>([])
+const pluginsLoading = ref(false)
+const datasetVersions = ref<{ versionId: string; versionTag: string; datasetCode: string; isFrozen: boolean }[]>([])
+const datasetVersionsLoading = ref(false)
+
+watch(showSubmit, async (visible) => {
+  if (!visible) return
+  if (plugins.value.length === 0) {
+    pluginsLoading.value = true
+    try {
+      const res = await algorithmApi.list({ page: 1, size: 100 })
+      plugins.value = res.data.data.items
+    } finally {
+      pluginsLoading.value = false
+    }
+  }
+  if (datasetVersions.value.length === 0) {
+    datasetVersionsLoading.value = true
+    try {
+      const res = await trainingApi.listDatasetVersions()
+      datasetVersions.value = res.data.data
+    } finally {
+      datasetVersionsLoading.value = false
+    }
+  }
+})
 
 const submitForm = reactive({
   pluginId: '',

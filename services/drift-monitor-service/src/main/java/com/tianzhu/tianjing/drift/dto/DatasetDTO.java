@@ -22,11 +22,24 @@ public record DatasetDTO(
         return new DatasetDTO(
                 d.getDatasetCode(),
                 d.getDatasetName(),
-                d.getFactoryCode(),
+                normalizeFactory(d.getFactoryCode()),
                 d.getTotalSamples() != null ? d.getTotalSamples() : 0,
                 d.getPositiveSamples() != null ? d.getPositiveSamples() : 0,
                 versions,
                 d.getCreatedAt()
         );
+    }
+
+    /** DB factory_code（大写）→ 前端 Factory 枚举值（小写），与 SceneConfigDetail.normalizeFactory 保持一致 */
+    private static String normalizeFactory(String dbValue) {
+        if (dbValue == null) return null;
+        return switch (dbValue.toUpperCase()) {
+            case "PELLET"  -> "pellet";
+            case "SINTER"  -> "sintering";
+            case "STEEL"   -> "steel";
+            case "SECTION" -> "section";
+            case "STRIP"   -> "strip";
+            default        -> dbValue.toLowerCase();
+        };
     }
 }

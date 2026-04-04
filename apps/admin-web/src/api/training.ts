@@ -24,4 +24,6 @@ export const trainingApi = {
     request.post('/training/jobs', data),
 
   cancelJob: (jobId: string) => request.post(`/training/jobs/${jobId}/cancel`),
+
+  listDatasetVersions: () => request.get('/training/dataset-versions'),
 }
