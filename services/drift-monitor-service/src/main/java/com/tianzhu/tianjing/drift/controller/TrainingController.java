@@ -11,6 +11,7 @@ import com.tianzhu.tianjing.drift.dto.DatasetDTO;
 import com.tianzhu.tianjing.drift.dto.TrainJobRequest;
 import com.tianzhu.tianjing.drift.repository.DatasetMapper;
 import com.tianzhu.tianjing.drift.repository.TrainJobMapper;
+import com.tianzhu.tianjing.drift.training.DockerTrainJobLauncher;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.exception.ErrorCode;
 import jakarta.validation.Valid;
@@ -21,7 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
+import java.time.OffsetDateTime;
 
 /**
  * 训练管理接口
@@ -36,6 +37,7 @@ public class TrainingController {
 
     private final TrainJobMapper trainJobMapper;
     private final DatasetMapper datasetMapper;
+    private final DockerTrainJobLauncher dockerTrainJobLauncher;
 
     @GetMapping("/jobs")
     public ApiResponse<PageResult<TrainJob>> listJobs(
@@ -84,6 +86,18 @@ public class TrainingController {
         }
         trainJobMapper.insert(job);
         log.info("提交训练作业 job_id={} plugin_id={} operator={}", job.getJobId(), job.getPluginId(), user.getUsername());
+
+        // 启动训练容器（docker run）；若容器启动失败，立即将作业置为 FAILED
+        try {
+            dockerTrainJobLauncher.launch(job);
+        } catch (Exception e) {
+            log.error("训练容器启动失败，将作业置为 FAILED job_id={}", job.getJobId(), e);
+            job.setStatus("FAILED");
+            job.setFinishedAt(OffsetDateTime.now());
+            job.setErrorMsg("训练容器启动失败: " + e.getMessage());
+            trainJobMapper.updateById(job);
+        }
+
         return ApiResponse.ok(job);
     }
 

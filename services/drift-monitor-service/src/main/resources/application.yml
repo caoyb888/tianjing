@@ -40,6 +40,20 @@ mybatis-plus:
 tianjing:
   jwt:
     public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
+  train:
+    # 训练启动方式：docker（测试环境）/ k8s（Sprint 5 GPU 正式环境）
+    launcher: ${TIANJING_TRAIN_LAUNCHER:docker}
+    # 训练容器镜像（CPU 模式，Sprint 3 流程验证用）
+    docker-image: ${TIANJING_TRAIN_DOCKER_IMAGE:tianjing/yolo-trainer:cpu-latest}
+    # 训练容器回调地址（训练脚本通过此地址汇报进度）
+    # 多服务器部署时应设为 Server 1 的内网 IP，如 http://10.30.10.49:8089
+    platform-callback-url: ${TIANJING_TRAIN_CALLBACK_URL:http://host.docker.internal:8089}
+    # MinIO 连接配置（训练容器下载数据集用）
+    minio-endpoint: ${TIANJING_MINIO_ENDPOINT:localhost:9000}
+    minio-access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    minio-secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    # MLflow Tracking Server（训练环境，生产环境不配置此项）
+    mlflow-tracking-uri: ${TIANJING_MLFLOW_TRACKING_URI:http://localhost:5000}
 
 management:
   endpoints:

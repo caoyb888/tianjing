@@ -1,14 +1,18 @@
 package com.tianzhu.tianjing.drift.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.OffsetDateTime;
+
 /**
- * MyBatis-Plus 配置：分页插件 + 乐观锁插件
+ * MyBatis-Plus 配置：分页插件 + 乐观锁插件 + 自动填充
  */
 @Configuration
 public class MybatisPlusConfig {
@@ -19,5 +23,18 @@ public class MybatisPlusConfig {
         interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.POSTGRE_SQL));
         return interceptor;
+    }
+
+    /** 自动填充 created_at（@FieldFill.INSERT 注解触发） */
+    @Bean
+    public MetaObjectHandler metaObjectHandler() {
+        return new MetaObjectHandler() {
+            @Override
+            public void insertFill(MetaObject metaObject) {
+                this.strictInsertFill(metaObject, "createdAt", OffsetDateTime.class, OffsetDateTime.now());
+            }
+            @Override
+            public void updateFill(MetaObject metaObject) { }
+        };
     }
 }
