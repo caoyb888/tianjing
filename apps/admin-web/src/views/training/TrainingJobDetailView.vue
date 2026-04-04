@@ -13,6 +13,25 @@
       </template>
     </PageHeader>
 
+    <!-- 训练完成后：模型版本跳转横幅 -->
+    <el-alert
+      v-if="job?.status === 'COMPLETED' && job.modelVersionId"
+      type="success"
+      :closable="false"
+      show-icon
+      class="model-version-banner"
+    >
+      <template #title>
+        训练完成，已自动注册模型版本
+        <span class="model-version-id">{{ job.modelVersionId }}</span>
+      </template>
+      <template #default>
+        <el-button type="primary" size="small" @click="goToModelVersion">
+          进入模型审核流程
+        </el-button>
+      </template>
+    </el-alert>
+
     <el-row :gutter="16" v-if="job">
       <el-col :md="12">
         <el-card shadow="never">
@@ -53,6 +72,16 @@
               <span v-if="job.mlflowRunId" class="mono">{{ job.mlflowRunId }}</span>
               <span v-else class="text-secondary">训练完成后自动填写</span>
             </el-descriptions-item>
+            <el-descriptions-item label="模型版本">
+              <el-link
+                v-if="job.modelVersionId"
+                type="primary"
+                @click="goToModelVersion"
+              >
+                {{ job.modelVersionId }}
+              </el-link>
+              <span v-else class="text-secondary">训练完成后自动注册</span>
+            </el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
@@ -62,7 +91,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -71,6 +100,7 @@ import { formatDateTime } from '@/utils/format'
 import type { TrainingJob } from '@/types'
 
 const route = useRoute()
+const router = useRouter()
 const jobId = route.params.jobId as string
 const job = ref<TrainingJob | null>(null)
 const loading = ref(false)
@@ -99,6 +129,12 @@ function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 
+function goToModelVersion() {
+  if (job.value?.modelVersionId) {
+    router.push({ name: 'ModelDetail', params: { versionId: job.value.modelVersionId } })
+  }
+}
+
 onMounted(() => {
   loadJob()
   pollTimer = setInterval(loadJob, 5000)
@@ -111,4 +147,13 @@ onUnmounted(stopPolling)
 .text-secondary { color: #909399; font-size: 13px; }
 .text-danger { color: #f56c6c; font-size: 13px; }
 .mono { font-family: monospace; font-size: 12px; }
+.model-version-banner {
+  margin-bottom: 16px;
+  .model-version-id {
+    font-family: monospace;
+    font-weight: 600;
+    margin: 0 8px;
+  }
+  .el-button { margin-top: 8px; }
+}
 </style>

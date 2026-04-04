@@ -201,6 +201,7 @@ export interface TrainingJob {
   bestMap50?: number
   bestMap5095?: number
   mlflowRunId?: string
+  modelVersionId?: string
   errorMsg?: string
   startedAt?: string
   finishedAt?: string

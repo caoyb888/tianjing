@@ -28,5 +28,9 @@ public record TrainJobCallbackRequest(
         Integer bestEpoch,
 
         @JsonProperty("error_msg")
-        String errorMsg
+        String errorMsg,
+
+        /** 训练完成后自动注册的模型版本 ID，COMPLETED 回调时写入 */
+        @JsonProperty("model_version_id")
+        String modelVersionId
 ) {}

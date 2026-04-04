@@ -42,15 +42,18 @@
 
     <!-- 提交新模型对话框 -->
     <el-dialog v-model="showSubmit" title="提交新模型版本" width="500px">
-      <el-form :model="submitForm" label-width="100px">
+      <el-form :model="submitForm" label-width="110px">
         <el-form-item label="插件 ID" required>
           <el-input v-model="submitForm.pluginId" placeholder="如：ATOM-DETECT-YOLO-V1" />
         </el-form-item>
         <el-form-item label="版本号" required>
           <el-input v-model="submitForm.version" placeholder="如：1.3.0" />
         </el-form-item>
-        <el-form-item label="模型文件路径" required>
-          <el-input v-model="submitForm.modelPath" placeholder="MinIO 路径" />
+        <el-form-item label="产物路径" required>
+          <el-input v-model="submitForm.modelArtifactUrl" placeholder="minio://tianjing-models-staging/..." />
+        </el-form-item>
+        <el-form-item label="MLflow Run ID">
+          <el-input v-model="submitForm.mlflowRunId" placeholder="可选，训练完成后自动填写" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -84,7 +87,7 @@ const showSubmit = ref(false)
 const submitting = ref(false)
 
 const canReview = computed(() => authStore.hasRole([UserRole.ADMIN, UserRole.MODEL_REVIEWER]))
-const submitForm = reactive({ pluginId: '', version: '', modelPath: '' })
+const submitForm = reactive({ pluginId: '', version: '', modelArtifactUrl: '', mlflowRunId: '' })
 
 async function loadModels() {
   loading.value = true
@@ -113,9 +116,15 @@ async function reviewModel(versionId: string, approved: boolean) {
 async function submitModel() {
   submitting.value = true
   try {
-    await modelApi.submit(submitForm)
+    await modelApi.submit({
+      plugin_id:          submitForm.pluginId,
+      version:            submitForm.version,
+      model_artifact_url: submitForm.modelArtifactUrl,
+      mlflow_run_id:      submitForm.mlflowRunId || undefined,
+    })
     ElMessage.success('模型已提交审核')
     showSubmit.value = false
+    Object.assign(submitForm, { pluginId: '', version: '', modelArtifactUrl: '', mlflowRunId: '' })
     loadModels()
   } finally {
     submitting.value = false

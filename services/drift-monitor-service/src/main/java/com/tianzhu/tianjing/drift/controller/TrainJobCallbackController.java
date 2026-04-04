@@ -58,12 +58,13 @@ public class TrainJobCallbackController {
             case "COMPLETED" -> {
                 job.setStatus("COMPLETED");
                 job.setFinishedAt(OffsetDateTime.now());
-                if (req.mlflowRunId() != null) job.setMlflowRunId(req.mlflowRunId());
-                if (req.bestMap50()   != null) job.setBestMap50(req.bestMap50());
-                if (req.bestMap5095() != null) job.setBestMap5095(req.bestMap5095());
-                if (req.bestEpoch()   != null) job.setBestEpoch(req.bestEpoch());
-                log.info("训练作业完成 job_id={} mlflow_run_id={} best_map50={}",
-                        jobId, req.mlflowRunId(), req.bestMap50());
+                if (req.mlflowRunId()     != null) job.setMlflowRunId(req.mlflowRunId());
+                if (req.bestMap50()       != null) job.setBestMap50(req.bestMap50());
+                if (req.bestMap5095()     != null) job.setBestMap5095(req.bestMap5095());
+                if (req.bestEpoch()       != null) job.setBestEpoch(req.bestEpoch());
+                if (req.modelVersionId()  != null) job.setModelVersionId(req.modelVersionId());
+                log.info("训练作业完成 job_id={} mlflow_run_id={} best_map50={} model_version_id={}",
+                        jobId, req.mlflowRunId(), req.bestMap50(), req.modelVersionId());
             }
             case "FAILED" -> {
                 job.setStatus("FAILED");

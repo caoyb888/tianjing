@@ -66,4 +66,8 @@ public class TrainJob {
 
     @TableField("created_by")
     private String createdBy;
+
+    /** 训练完成后自动注册的模型版本 ID，DB列名 model_version_id */
+    @TableField("model_version_id")
+    private String modelVersionId;
 }
