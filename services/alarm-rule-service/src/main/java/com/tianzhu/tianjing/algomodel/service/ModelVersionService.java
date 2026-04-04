@@ -79,6 +79,7 @@ public class ModelVersionService {
                     "当前状态 " + mv.getStatus() + " 不允许提交审核");
         }
         mv.setStatus("REVIEWING");
+        mv.setSubmittedBy(operator);
         modelVersionMapper.updateById(mv);
         return mv;
     }
@@ -95,8 +96,9 @@ public class ModelVersionService {
             throw BusinessException.of(ErrorCode.RESOURCE_STATE_FORBIDDEN, "当前状态不允许审核操作");
         }
 
-        // 四眼原则：审核人不能是提交人
-        if (reviewer.equals(mv.getCreatedBy())) {
+        // 四眼原则：审核人不能是提交人（submittedBy 为空时降级比较 createdBy）
+        String submitter = mv.getSubmittedBy() != null ? mv.getSubmittedBy() : mv.getCreatedBy();
+        if (reviewer.equals(submitter)) {
             throw BusinessException.forbidden(ErrorCode.FOUR_EYES_VIOLATION);
         }
 

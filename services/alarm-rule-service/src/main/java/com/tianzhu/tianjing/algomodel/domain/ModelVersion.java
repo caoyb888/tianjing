@@ -76,6 +76,10 @@ public class ModelVersion {
     @TableField("sandbox_recall")
     private Double sandboxRecall;
 
+    /** 提交审核人，DB列名 submitted_by */
+    @TableField("submitted_by")
+    private String submittedBy;
+
     @TableField("approved_by")
     private String approvedBy;
 
@@ -88,7 +92,7 @@ public class ModelVersion {
     @TableField("deprecated_at")
     private OffsetDateTime deprecatedAt;
 
-    @TableLogic
+    @TableLogic(value = "false", delval = "true")
     private Boolean isDeleted;
 
     @TableField(value = "created_at", fill = FieldFill.INSERT) private OffsetDateTime createdAt;

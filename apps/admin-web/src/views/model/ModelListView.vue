@@ -20,8 +20,8 @@
         </template>
       </el-table-column>
       <el-table-column label="提交人" prop="submittedBy" width="120" />
-      <el-table-column label="审核人" prop="reviewedBy" width="120">
-        <template #default="{ row }">{{ row.reviewedBy || '-' }}</template>
+      <el-table-column label="审核人" prop="approvedBy" width="120">
+        <template #default="{ row }">{{ row.approvedBy || '-' }}</template>
       </el-table-column>
       <el-table-column label="创建时间" width="170">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>

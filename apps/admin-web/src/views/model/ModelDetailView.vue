@@ -65,7 +65,7 @@
               </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="提交人">{{ model.submittedBy }}</el-descriptions-item>
-            <el-descriptions-item label="审核人">{{ model.reviewedBy || '待审核' }}</el-descriptions-item>
+            <el-descriptions-item label="审核人">{{ model.approvedBy || '待审核' }}</el-descriptions-item>
             <el-descriptions-item label="提交时间">{{ formatDateTime(model.createdAt) }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
