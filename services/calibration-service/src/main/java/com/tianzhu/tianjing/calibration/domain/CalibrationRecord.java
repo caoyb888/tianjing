@@ -61,7 +61,7 @@ public class CalibrationRecord {
     @TableField("remark")
     private String remark;
 
-    @TableLogic
+    @TableLogic(value = "false", delval = "true")
     private Boolean isDeleted;
 
     @TableField(value = "created_at", fill = FieldFill.INSERT)

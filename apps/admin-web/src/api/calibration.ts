@@ -5,5 +5,5 @@ export const calibrationApi = {
     request.post(`/calibration/${sceneId}`, data),
 
   getHistory: (sceneId: string, params?: { page?: number; size?: number }) =>
-    request.get(`/calibration/${sceneId}/history`, { params }),
+    request.get(`/calibration/${sceneId}`, { params }),
 }
