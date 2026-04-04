@@ -9,7 +9,7 @@ import java.time.OffsetDateTime;
  * 规范：数据库设计文档 V2，CLAUDE.md §11
  */
 @Data
-@TableName(value = "sandbox_infer_session", schema = "tianjing_sandbox")
+@TableName("sandbox_infer_session")
 public class SandboxSession {
     @TableId(type = IdType.AUTO) private Long id;
 

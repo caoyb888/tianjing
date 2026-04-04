@@ -72,7 +72,6 @@
           </el-card>
         </el-col>
       </el-row>
-    </div>
 
       <!-- 样本帧对比 -->
       <el-card shadow="never" style="margin-top: 16px" v-if="report.sample_frame">

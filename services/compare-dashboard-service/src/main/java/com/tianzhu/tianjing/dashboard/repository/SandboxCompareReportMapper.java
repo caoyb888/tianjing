@@ -6,6 +6,6 @@ import org.apache.ibatis.annotations.Select;
 import java.util.Optional;
 @Mapper
 public interface SandboxCompareReportMapper extends BaseMapper<SandboxCompareReport> {
-    @Select("SELECT * FROM tianjing_sandbox.sandbox_compare_report WHERE session_id = #{sessionId} ORDER BY created_at DESC LIMIT 1")
+    @Select("SELECT * FROM sandbox_compare_report WHERE session_id = #{sessionId} ORDER BY created_at DESC LIMIT 1")
     Optional<SandboxCompareReport> selectLatestBySession(String sessionId);
 }

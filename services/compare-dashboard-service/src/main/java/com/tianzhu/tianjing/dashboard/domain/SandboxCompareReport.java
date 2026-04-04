@@ -9,7 +9,7 @@ import java.time.OffsetDateTime;
  * 转正门禁：sandbox_precision >= prod_precision * 1.02（精度提升 ≥ 2%）
  */
 @Data
-@TableName(value = "sandbox_compare_report", schema = "tianjing_sandbox")
+@TableName("sandbox_compare_report")
 public class SandboxCompareReport {
     @TableId(type = IdType.AUTO) private Long id;
 

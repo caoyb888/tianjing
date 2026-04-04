@@ -132,7 +132,7 @@ get_pid_on_port() {
 health_check() {
   local port=$1
   local code
-  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "http://localhost:$port/actuator/health" 2>/dev/null)
+  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 --noproxy localhost "http://localhost:$port/actuator/health" 2>/dev/null)
   echo "$code"
 }
 

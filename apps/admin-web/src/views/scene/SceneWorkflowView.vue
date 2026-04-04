@@ -76,6 +76,48 @@
             <el-input v-model="selectedNode.data.label" @change="updateNodeData" />
           </el-form-item>
 
+          <!-- 视频源特有属性 -->
+          <template v-if="selectedNode.type === 'videoSource'">
+            <el-form-item label="摄像头">
+              <el-select
+                v-model="selectedNode.data.device_code"
+                filterable
+                allow-create
+                placeholder="选择或输入设备编码"
+                style="width:100%"
+                @change="updateNodeData"
+              >
+                <el-option
+                  v-for="opt in cameraOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="镜像帧率">
+              <el-input-number
+                v-model="selectedNode.data.mirror_fps"
+                :min="1"
+                :max="25"
+                style="width:100%"
+                @change="updateNodeData"
+              />
+            </el-form-item>
+          </template>
+
+          <!-- 预处理特有属性 -->
+          <template v-if="selectedNode.type === 'preprocess'">
+            <el-form-item label="处理类型">
+              <el-select v-model="selectedNode.data.preprocess_type" style="width:100%" @change="updateNodeData">
+                <el-option label="去雾增强" value="dehaze" />
+                <el-option label="亮度调整" value="brightness" />
+                <el-option label="ROI 裁剪" value="crop" />
+                <el-option label="对比度增强" value="contrast" />
+              </el-select>
+            </el-form-item>
+          </template>
+
           <!-- 推理节点特有属性 -->
           <template v-if="selectedNode.type === 'inference'">
             <el-form-item label="插件ID">
@@ -111,6 +153,20 @@
             </el-form-item>
           </template>
 
+          <!-- 存储动作特有属性 -->
+          <template v-if="selectedNode.type === 'storage'">
+            <el-form-item label="保留时长">
+              <el-input-number
+                v-model="selectedNode.data.retention_hours"
+                :min="1"
+                :max="720"
+                style="width:100%"
+                @change="updateNodeData"
+              />
+            </el-form-item>
+            <div style="font-size:11px;color:#909399;margin:-8px 0 8px 90px">单位：小时，最长 720h（30天）</div>
+          </template>
+
           <!-- MQTT 推送属性 -->
           <template v-if="selectedNode.type === 'mqttPush'">
             <el-form-item label="Topic">
@@ -143,6 +199,7 @@ import { Share, RefreshLeft, DocumentAdd } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import WorkflowNode from '@/components/business/WorkflowNode.vue'
 import { sceneApi } from '@/api/scene'
+import { deviceApi } from '@/api/device'
 
 const route = useRoute()
 const sceneId = route.params.sceneId as string
@@ -151,6 +208,22 @@ const saving = ref(false)
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 const selectedNode = ref<Node | null>(null)
+
+// 摄像头设备列表（供视频源节点选择）
+const cameraOptions = ref<{ label: string; value: string }[]>([])
+
+async function loadCameraOptions() {
+  try {
+    const res = await deviceApi.list({ size: 200 })
+    const items: any[] = res.data?.data?.items ?? res.data?.items ?? []
+    cameraOptions.value = items.map((d: any) => ({
+      label: `${d.deviceName ?? d.device_name}（${d.deviceCode ?? d.device_code}）`,
+      value: d.deviceCode ?? d.device_code,
+    }))
+  } catch {
+    // 加载失败时不阻断编排器使用，手动输入设备编码即可
+  }
+}
 
 const { addNodes, removeNodes, findNode } = useVueFlow()
 
@@ -182,11 +255,22 @@ function onDrop(event: DragEvent) {
     position,
     data: {
       label: nodeTypes.find((t) => t.type === dragNodeType)?.label || dragNodeType,
+      // 视频源
+      device_code: '',
+      mirror_fps: 5,
+      // 预处理
+      preprocess_type: 'dehaze',
+      // 推理插件
       plugin_id: '',
       conf_threshold: 0.85,
+      // 逻辑门
+      condition: 'confidence_threshold',
+      // 告警动作
       level: 'WARNING',
       confirm_frames: 3,
-      condition: 'confidence_threshold',
+      // 存储动作
+      retention_hours: 72,
+      // MQTT 推送
       topic: `iiot/tianjing/alarm/${sceneId}`,
     },
   }
@@ -194,7 +278,7 @@ function onDrop(event: DragEvent) {
   dragNodeType = ''
 }
 
-function onNodeClick(_: unknown, node: Node) {
+function onNodeClick({ node }: { node: Node }) {
   selectedNode.value = { ...node }
 }
 
@@ -240,7 +324,10 @@ async function saveWorkflow() {
   }
 }
 
-onMounted(loadWorkflow)
+onMounted(() => {
+  loadWorkflow()
+  loadCameraOptions()
+})
 </script>
 
 <style scoped lang="scss">
