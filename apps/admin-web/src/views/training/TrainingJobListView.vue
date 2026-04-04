@@ -7,25 +7,19 @@
     </PageHeader>
 
     <DataTable :data="jobs" :total="total" :loading="loading" v-model:page="page" v-model:size="size" @change="loadJobs">
-      <el-table-column label="作业ID" prop="jobId" width="200" />
-      <el-table-column label="场景" prop="sceneId" width="180" />
-      <el-table-column label="数据集" prop="datasetCode" width="180" />
+      <el-table-column label="作业ID" prop="jobId" width="220" />
+      <el-table-column label="插件ID" prop="pluginId" width="200" />
+      <el-table-column label="数据集版本" prop="datasetVersionId" width="180" />
       <el-table-column label="状态" width="110">
         <template #default="{ row }"><StatusBadge :status="row.status" /></template>
       </el-table-column>
-      <el-table-column label="进度" min-width="140">
+      <el-table-column label="最佳 mAP@50" width="120" align="right">
         <template #default="{ row }">
-          <div v-if="row.status === 'running'">
-            <el-progress :percentage="row.progress" :stroke-width="8" />
-            <div class="epoch-info">Epoch {{ row.currentEpoch }}/{{ row.totalEpochs }}</div>
-          </div>
-          <span v-else>{{ row.progress }}%</span>
+          {{ row.bestMap50 != null ? (row.bestMap50 * 100).toFixed(1) + '%' : '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="mAP@50" width="100">
-        <template #default="{ row }">
-          {{ row.metrics?.map50 ? (row.metrics.map50 * 100).toFixed(1) + '%' : '-' }}
-        </template>
+      <el-table-column label="触发方式" width="110">
+        <template #default="{ row }">{{ row.triggerType || '-' }}</template>
       </el-table-column>
       <el-table-column label="创建时间" width="170">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
@@ -33,22 +27,32 @@
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button link size="small" @click="$router.push(`/training/jobs/${row.jobId}`)">详情</el-button>
-          <el-button v-if="row.status === 'running' || row.status === 'queued'" link size="small" type="warning" @click="cancelJob(row.jobId)">取消</el-button>
+          <el-button
+            v-if="row.status === 'RUNNING' || row.status === 'PENDING'"
+            link size="small" type="warning"
+            @click="cancelJob(row.jobId)"
+          >
+            取消
+          </el-button>
         </template>
       </el-table-column>
     </DataTable>
 
     <!-- 提交作业对话框 -->
-    <el-dialog v-model="showSubmit" title="提交训练作业" width="500px">
-      <el-form :model="submitForm" label-width="100px">
-        <el-form-item label="场景 ID" required>
-          <el-input v-model="submitForm.sceneId" placeholder="如：SCENE-SINTER-005" />
+    <el-dialog v-model="showSubmit" title="提交训练作业" width="520px">
+      <el-form :model="submitForm" label-width="110px">
+        <el-form-item label="插件 ID" required>
+          <el-input v-model="submitForm.pluginId" placeholder="如：ATOM-DETECT-YOLO-V1" />
         </el-form-item>
-        <el-form-item label="数据集编号" required>
-          <el-input v-model="submitForm.datasetCode" placeholder="如：DS-SINTER-001" />
+        <el-form-item label="数据集版本 ID" required>
+          <el-input v-model="submitForm.datasetVersionId" placeholder="如：DS-SINTER-FIRE-001-v1.0" />
         </el-form-item>
         <el-form-item label="训练轮次">
-          <el-input-number v-model="submitForm.epochs" :min="10" :max="300" style="width: 100%" />
+          <el-input-number v-model="submitForm.epochs" :min="1" :max="300" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="GPU 数量">
+          <el-input-number v-model="submitForm.gpuCount" :min="1" :max="8" style="width: 100%" />
+          <div class="form-hint">测试环境 CPU 模式下此字段忽略，保持默认值 1 即可</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -78,7 +82,12 @@ const size = ref(20)
 const showSubmit = ref(false)
 const submitting = ref(false)
 
-const submitForm = reactive({ sceneId: '', datasetCode: '', epochs: 100 })
+const submitForm = reactive({
+  pluginId: '',
+  datasetVersionId: '',
+  epochs: 10,
+  gpuCount: 1,
+})
 
 async function loadJobs() {
   loading.value = true
@@ -98,11 +107,24 @@ async function cancelJob(jobId: string) {
 }
 
 async function submitJob() {
+  if (!submitForm.pluginId || !submitForm.datasetVersionId) {
+    ElMessage.warning('插件 ID 和数据集版本 ID 为必填项')
+    return
+  }
   submitting.value = true
   try {
-    await trainingApi.submitJob(submitForm)
+    await trainingApi.submitJob({
+      plugin_id: submitForm.pluginId,
+      dataset_version_id: submitForm.datasetVersionId,
+      gpu_count: submitForm.gpuCount,
+      train_config_json: { epochs: submitForm.epochs, img_size: 640, batch_size: 8 },
+    })
     ElMessage.success('训练作业已提交')
     showSubmit.value = false
+    submitForm.pluginId = ''
+    submitForm.datasetVersionId = ''
+    submitForm.epochs = 10
+    submitForm.gpuCount = 1
     loadJobs()
   } finally {
     submitting.value = false
@@ -113,5 +135,5 @@ onMounted(loadJobs)
 </script>
 
 <style scoped lang="scss">
-.epoch-info { font-size: 11px; color: #909399; margin-top: 2px; }
+.form-hint { font-size: 12px; color: #909399; margin-top: 4px; line-height: 1.4; }
 </style>

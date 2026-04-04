@@ -4,7 +4,7 @@
       <template #actions>
         <el-button @click="$router.back()">返回</el-button>
         <el-button
-          v-if="job?.status === 'running' || job?.status === 'queued'"
+          v-if="job?.status === 'RUNNING' || job?.status === 'PENDING'"
           type="warning"
           @click="cancelJob"
         >
@@ -19,36 +19,39 @@
           <template #header><span class="card-title">作业信息</span></template>
           <el-descriptions :column="1" border>
             <el-descriptions-item label="作业ID">{{ job.jobId }}</el-descriptions-item>
-            <el-descriptions-item label="场景">{{ job.sceneId }}</el-descriptions-item>
-            <el-descriptions-item label="数据集">{{ job.datasetCode }}</el-descriptions-item>
+            <el-descriptions-item label="插件ID">{{ job.pluginId }}</el-descriptions-item>
+            <el-descriptions-item label="数据集版本">{{ job.datasetVersionId }}</el-descriptions-item>
+            <el-descriptions-item label="触发方式">{{ job.triggerType || '-' }}</el-descriptions-item>
             <el-descriptions-item label="状态"><StatusBadge :status="job.status" /></el-descriptions-item>
             <el-descriptions-item label="创建时间">{{ formatDateTime(job.createdAt) }}</el-descriptions-item>
-            <el-descriptions-item v-if="job.completedAt" label="完成时间">
-              {{ formatDateTime(job.completedAt) }}
+            <el-descriptions-item v-if="job.startedAt" label="开始时间">
+              {{ formatDateTime(job.startedAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="job.finishedAt" label="完成时间">
+              {{ formatDateTime(job.finishedAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item v-if="job.errorMsg" label="错误信息">
+              <span class="text-danger">{{ job.errorMsg }}</span>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
       <el-col :md="12">
         <el-card shadow="never">
-          <template #header><span class="card-title">训练进度</span></template>
-          <div class="progress-section">
-            <el-progress
-              :percentage="job.progress"
-              :stroke-width="16"
-              :status="job.status === 'failed' ? 'exception' : job.status === 'completed' ? 'success' : undefined"
-            />
-            <div v-if="job.currentEpoch" class="epoch-text">
-              Epoch {{ job.currentEpoch }} / {{ job.totalEpochs }}
-            </div>
-          </div>
-          <el-divider v-if="job.metrics" />
-          <el-descriptions v-if="job.metrics" :column="2" size="small">
-            <el-descriptions-item label="mAP@50">
-              {{ job.metrics.map50 ? (job.metrics.map50 * 100).toFixed(2) + '%' : '-' }}
+          <template #header><span class="card-title">训练指标</span></template>
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="最佳 Epoch">
+              {{ job.bestEpoch ?? '-' }}
             </el-descriptions-item>
-            <el-descriptions-item label="Loss">
-              {{ job.metrics.loss?.toFixed(4) || '-' }}
+            <el-descriptions-item label="最佳 mAP@50">
+              {{ job.bestMap50 != null ? (job.bestMap50 * 100).toFixed(2) + '%' : '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="最佳 mAP@50-95">
+              {{ job.bestMap5095 != null ? (job.bestMap5095 * 100).toFixed(2) + '%' : '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="MLflow Run ID">
+              <span v-if="job.mlflowRunId" class="mono">{{ job.mlflowRunId }}</span>
+              <span v-else class="text-secondary">训练完成后自动填写</span>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -78,7 +81,7 @@ async function loadJob() {
   try {
     const res = await trainingApi.getJob(jobId)
     job.value = res.data.data
-    if (['completed', 'failed', 'cancelled'].includes(job.value.status)) {
+    if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(job.value?.status ?? '')) {
       stopPolling()
     }
   } finally {
@@ -104,7 +107,8 @@ onUnmounted(stopPolling)
 </script>
 
 <style scoped lang="scss">
-.progress-section { margin: 16px 0; }
-.epoch-text { text-align: center; font-size: 13px; color: #909399; margin-top: 8px; }
 .card-title { font-weight: 600; }
+.text-secondary { color: #909399; font-size: 13px; }
+.text-danger { color: #f56c6c; font-size: 13px; }
+.mono { font-family: monospace; font-size: 12px; }
 </style>

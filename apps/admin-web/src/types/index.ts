@@ -148,8 +148,8 @@ export interface ModelVersion {
   pluginId: string
   version: string
   status: ModelStatus
-  submittedBy: string
-  reviewedBy?: string
+  submittedBy?: string
+  approvedBy?: string
   createdAt: string
   sandboxSessionId?: string
 }
@@ -189,21 +189,23 @@ export interface TrainingDataset {
   createdAt: string
 }
 
-// 训练作业
+// 训练作业（与后端 TrainJob 实体对齐）
+// 状态机：PENDING → RUNNING → COMPLETED / FAILED / CANCELLED
 export interface TrainingJob {
   jobId: string
-  datasetCode: string
-  sceneId: string
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
-  progress: number
-  currentEpoch?: number
-  totalEpochs?: number
-  metrics?: {
-    map50?: number
-    loss?: number
-  }
+  pluginId: string
+  datasetVersionId: string
+  triggerType?: string
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+  bestEpoch?: number
+  bestMap50?: number
+  bestMap5095?: number
+  mlflowRunId?: string
+  errorMsg?: string
+  startedAt?: string
+  finishedAt?: string
   createdAt: string
-  completedAt?: string
+  createdBy?: string
 }
 
 // 路由元信息扩展
