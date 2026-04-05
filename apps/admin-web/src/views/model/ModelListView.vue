@@ -44,7 +44,20 @@
     <el-dialog v-model="showSubmit" title="提交新模型版本" width="500px">
       <el-form :model="submitForm" label-width="110px">
         <el-form-item label="插件 ID" required>
-          <el-input v-model="submitForm.pluginId" placeholder="如：ATOM-DETECT-YOLO-V1" />
+          <el-select
+            v-model="submitForm.pluginId"
+            placeholder="请选择算法插件"
+            style="width: 100%"
+            :loading="pluginsLoading"
+            filterable
+          >
+            <el-option
+              v-for="p in plugins"
+              :key="p.pluginId"
+              :value="p.pluginId"
+              :label="`${p.name}（${p.pluginId}）`"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="版本号" required>
           <el-input v-model="submitForm.version" placeholder="如：1.3.0" />
@@ -65,15 +78,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import PermissionButton from '@/components/common/PermissionButton.vue'
 import { modelApi } from '@/api/model'
+import { algorithmApi } from '@/api/algorithm'
 import { MODEL_STATUS_CONFIG } from '@/constants'
-import { UserRole, ModelStatus, type ModelVersion } from '@/types'
+import { UserRole, ModelStatus, type ModelVersion, type AlgorithmPlugin } from '@/types'
 import { formatDateTime } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
 
@@ -85,9 +99,23 @@ const page = ref(1)
 const size = ref(20)
 const showSubmit = ref(false)
 const submitting = ref(false)
+const plugins = ref<AlgorithmPlugin[]>([])
+const pluginsLoading = ref(false)
 
 const canReview = computed(() => authStore.hasRole([UserRole.ADMIN, UserRole.MODEL_REVIEWER]))
 const submitForm = reactive({ pluginId: '', version: '', modelArtifactUrl: '', mlflowRunId: '' })
+
+watch(showSubmit, async (visible) => {
+  if (visible && plugins.value.length === 0) {
+    pluginsLoading.value = true
+    try {
+      const res = await algorithmApi.list({ page: 1, size: 100 })
+      plugins.value = res.data.data.items
+    } finally {
+      pluginsLoading.value = false
+    }
+  }
+})
 
 async function loadModels() {
   loading.value = true

@@ -10,6 +10,7 @@
           <span class="card-title">精度趋势（最近 30 天）</span>
           <el-select v-model="selectedScene" placeholder="选择场景" clearable style="width: 220px" @change="loadMetrics">
             <el-option label="全部场景" value="" />
+            <el-option v-for="s in sceneOptions" :key="s" :label="s" :value="s" />
           </el-select>
         </div>
       </template>
@@ -79,6 +80,7 @@ const loading = ref(false)
 const selectedScene = ref('')
 const metricsData = ref<Array<{ date: string; precision: number; recall: number }>>([])
 const sceneMetrics = ref<unknown[]>([])
+const sceneOptions = ref<string[]>([])
 
 async function loadMetrics() {
   loading.value = true
@@ -86,6 +88,11 @@ async function loadMetrics() {
     const res = await driftApi.getMetrics({ sceneId: selectedScene.value || undefined })
     metricsData.value = res.data.data.trend || []
     sceneMetrics.value = res.data.data.scenes || []
+    // 首次加载时从返回结果提取场景选项
+    if (sceneOptions.value.length === 0) {
+      sceneOptions.value = (res.data.data.scenes as Array<{ scene_id: string }>)
+        .map(s => s.scene_id)
+    }
   } finally {
     loading.value = false
   }
