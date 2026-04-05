@@ -27,14 +27,22 @@ public class DashboardController {
 
     /**
      * GET /dashboard/overview — 平台概览统计
+     * 字段名与前端 DashboardView stats 计算属性对齐
      */
     @GetMapping("/overview")
     public ApiResponse<Map<String, Object>> overview() {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("total_scenes", 16);
+        // 统计卡片字段（前端 stats computed 使用）
         data.put("active_scenes", 1);
-        data.put("total_alarms_today", 0);
-        data.put("critical_alarms_today", 0);
+        data.put("online_devices", 0);
+        data.put("today_alarms", 0);
+        data.put("today_inferences", 0);
+        // 告警饼图字段（AlarmHeatmapChart 使用）
+        data.put("critical_alarms", 0);
+        data.put("warning_alarms", 0);
+        data.put("info_alarms", 0);
+        // 附加字段
+        data.put("total_scenes", 16);
         data.put("avg_infer_latency_ms", 0.0);
         data.put("sandbox_sessions_running", 0);
         data.put("factories", List.of(
@@ -72,10 +80,11 @@ public class DashboardController {
     }
 
     /**
-     * GET /dashboard/inference/trend — 推理统计趋势（近 7 天）
+     * GET /dashboard/inference-trend — 推理统计趋势（近 N 天）
+     * 返回字段与 InferenceTrendChart 对齐：time / count / alarms
      */
     @GetMapping("/inference-trend")
-    public ApiResponse<Map<String, Object>> inferenceTrend(
+    public ApiResponse<List<Map<String, Object>>> inferenceTrend(
             @RequestParam(defaultValue = "7") int days,
             @RequestParam(required = false) String scene_id) {
         // 暂返回空趋势数据，Sprint 3 接入 TDengine 后填充实际数据
@@ -83,13 +92,13 @@ public class DashboardController {
         for (int i = days - 1; i >= 0; i--) {
             OffsetDateTime day = OffsetDateTime.now().minusDays(i);
             trend.add(Map.of(
-                    "date", day.toLocalDate().toString(),
-                    "infer_count", 0,
-                    "alarm_count", 0,
+                    "time", day.toLocalDate().toString(),
+                    "count", 0,
+                    "alarms", 0,
                     "avg_latency_ms", 0.0
             ));
         }
-        return ApiResponse.ok(Map.of("days", days, "scene_id", scene_id != null ? scene_id : "all", "trend", trend));
+        return ApiResponse.ok(trend);
     }
 
     /**

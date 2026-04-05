@@ -152,10 +152,13 @@ async function loadData() {
   try {
     const [overviewRes, trendRes] = await Promise.all([
       dashboardApi.getOverview(),
-      dashboardApi.getInferenceTrend({ interval: '1d', days: 7 }),
+      dashboardApi.getInferenceTrend({ days: 7 }),
     ])
     overview.value = overviewRes.data.data
-    trendData.value = trendRes.data.data
+    // inference-trend 直接返回趋势数组
+    trendData.value = Array.isArray(trendRes.data.data)
+      ? trendRes.data.data
+      : trendRes.data.data?.trend ?? []
   } finally {
     loading.value = false
   }
