@@ -14,8 +14,9 @@
       </el-table-column>
       <el-table-column label="进度" min-width="140">
         <template #default="{ row }">
-          <el-progress v-if="row.status === 'running'" :percentage="row.progress" :stroke-width="8" />
-          <span v-else>{{ row.progress }}%</span>
+          <el-progress v-if="row.status === 'RUNNING'" :percentage="50" :stroke-width="8" :striped="true" striped-flow />
+          <span v-else-if="row.status === 'COMPLETED'" style="color: #67c23a">100%</span>
+          <span v-else>—</span>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" width="170">
@@ -24,7 +25,7 @@
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button link size="small" @click="$router.push(`/simulations/${row.taskId}`)">详情</el-button>
-          <el-button v-if="row.status === 'running' || row.status === 'pending'" link size="small" type="warning" @click="cancelTask(row.taskId)">取消</el-button>
+          <el-button v-if="row.status === 'RUNNING' || row.status === 'PENDING'" link size="small" type="warning" @click="cancelTask(row.taskId)">取消</el-button>
         </template>
       </el-table-column>
     </DataTable>

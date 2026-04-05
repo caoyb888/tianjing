@@ -4,7 +4,7 @@
       <template #actions>
         <el-button @click="$router.back()">返回</el-button>
         <el-button
-          v-if="task?.status === 'running' || task?.status === 'pending'"
+          v-if="task?.status === 'RUNNING' || task?.status === 'PENDING'"
           type="warning"
           @click="cancelTask"
         >
@@ -21,12 +21,12 @@
             <el-descriptions-item label="任务ID">{{ task.taskId }}</el-descriptions-item>
             <el-descriptions-item label="场景">{{ task.sceneId }}</el-descriptions-item>
             <el-descriptions-item label="视频文件">
-              <el-text truncated style="max-width: 220px">{{ task.videoUrl }}</el-text>
+              <el-text truncated style="max-width: 220px">{{ task.videoFileUrl }}</el-text>
             </el-descriptions-item>
             <el-descriptions-item label="状态"><StatusBadge :status="task.status" /></el-descriptions-item>
             <el-descriptions-item label="创建时间">{{ formatDateTime(task.createdAt) }}</el-descriptions-item>
-            <el-descriptions-item v-if="task.completedAt" label="完成时间">
-              {{ formatDateTime(task.completedAt) }}
+            <el-descriptions-item v-if="task.finishedAt" label="完成时间">
+              {{ formatDateTime(task.finishedAt) }}
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -36,9 +36,9 @@
           <template #header><span class="card-title">推理进度</span></template>
           <div style="padding: 20px 0">
             <el-progress
-              :percentage="task.progress ?? 0"
+              :percentage="task.status === 'COMPLETED' ? 100 : task.status === 'FAILED' ? 100 : 0"
               :stroke-width="20"
-              :status="task.status === 'failed' ? 'exception' : task.status === 'completed' ? 'success' : undefined"
+              :status="task.status === 'FAILED' ? 'exception' : task.status === 'COMPLETED' ? 'success' : undefined"
             />
           </div>
           <el-result
@@ -53,7 +53,7 @@
 
     <!-- 导出训练数据集区域（仿真完成后显示） -->
     <el-card
-      v-if="task?.status === 'COMPLETED' || task?.status === 'completed'"
+      v-if="task?.status === 'COMPLETED'"
       shadow="never"
       style="margin-top: 16px"
     >
@@ -201,7 +201,7 @@ async function loadTask() {
   try {
     const res = await simulationApi.get(taskId)
     task.value = res.data.data
-    if (['completed', 'failed', 'cancelled', 'COMPLETED', 'FAILED'].includes(task.value?.status ?? '')) {
+    if (['COMPLETED', 'FAILED'].includes(task.value?.status ?? '')) {
       stopPolling()
     }
   } finally {

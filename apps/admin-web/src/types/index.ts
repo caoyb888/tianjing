@@ -167,15 +167,19 @@ export interface SandboxSession {
   comparedToProduction?: boolean
 }
 
-// 仿真任务
+// 仿真任务（字段名与后端 SimulationTask 实体对齐）
 export interface SimulationTask {
   taskId: string
   sceneId: string
-  videoUrl: string
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
-  progress: number
+  taskName: string
+  videoFileUrl: string          // 对应实体 videoFileUrl
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+  totalFrames?: number
+  matchedAlarms?: number
+  falseAlarmCount?: number
+  errorMsg?: string
   createdAt: string
-  completedAt?: string
+  finishedAt?: string           // 对应实体 finishedAt，不是 completedAt
 }
 
 // 训练数据集
