@@ -14,7 +14,7 @@
       </el-table-column>
       <el-table-column label="进度" min-width="140">
         <template #default="{ row }">
-          <el-progress v-if="row.status === 'RUNNING'" :percentage="50" :stroke-width="8" :striped="true" striped-flow />
+          <el-progress v-if="row.status === 'RUNNING'" :percentage="row.progress ?? 0" :stroke-width="8" :striped="true" striped-flow />
           <span v-else-if="row.status === 'COMPLETED'" style="color: #67c23a">100%</span>
           <span v-else>—</span>
         </template>
@@ -35,6 +35,18 @@
       <el-form :model="createForm" label-width="120px">
         <el-form-item label="目标场景 ID" required>
           <el-input v-model="createForm.sceneId" placeholder="如：SCENE-SINTER-005" />
+        </el-form-item>
+        <el-form-item label="推理插件">
+          <el-select v-model="createForm.pluginId" style="width: 100%">
+            <el-option v-for="p in pluginOptions" :key="p.pluginId" :label="p.name" :value="p.pluginId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="抽帧频率">
+          <el-radio-group v-model="createForm.frameFps">
+            <el-radio :value="1">1 fps（默认，数据量小）</el-radio>
+            <el-radio :value="2">2 fps</el-radio>
+            <el-radio :value="5">5 fps（数据量大）</el-radio>
+          </el-radio-group>
         </el-form-item>
         <el-form-item label="视频文件">
           <el-upload
@@ -72,6 +84,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { simulationApi } from '@/api/simulation'
+import { algorithmApi } from '@/api/algorithm'
 import { formatDateTime } from '@/utils/format'
 import type { SimulationTask } from '@/types'
 
@@ -85,7 +98,27 @@ const creating = ref(false)
 const uploadProgress = ref(0)
 const uploadedVideoUrl = ref('')
 
-const createForm = reactive({ sceneId: '', videoUrl: '' })
+const createForm = reactive({ sceneId: '', videoUrl: '', pluginId: 'CLOUD-PROXY-V1', frameFps: 1 })
+
+// 推理插件列表（从 alarm-rule-service 获取）
+const pluginOptions = ref<{ pluginId: string; name: string }[]>([
+  { pluginId: 'CLOUD-PROXY-V1', name: 'CLOUD-PROXY-V1（云端推理代理）' }
+])
+
+async function loadPlugins() {
+  try {
+    const res = await algorithmApi.list({ page: 1, size: 50 })
+    const items = res.data?.data?.items ?? []
+    if (items.length > 0) {
+      pluginOptions.value = items.map((p: any) => ({
+        pluginId: p.pluginId ?? p.plugin_id,
+        name: `${p.pluginId ?? p.plugin_id}（${p.name ?? ''}）`
+      }))
+    }
+  } catch {
+    // 插件列表加载失败不阻断流程，保留默认选项
+  }
+}
 
 async function loadTasks() {
   loading.value = true
@@ -114,8 +147,13 @@ async function handleVideoUpload(file: File) {
 async function createTask() {
   creating.value = true
   try {
-    await simulationApi.create(createForm)
-    ElMessage.success('仿真任务已创建')
+    await simulationApi.create({
+      sceneId:  createForm.sceneId,
+      videoUrl: createForm.videoUrl,
+      pluginId: createForm.pluginId,
+      frameFps: createForm.frameFps,
+    })
+    ElMessage.success('仿真任务已创建，正在后台执行推理…')
     showCreate.value = false
     uploadedVideoUrl.value = ''
     loadTasks()
@@ -130,7 +168,10 @@ async function cancelTask(taskId: string) {
   loadTasks()
 }
 
-onMounted(loadTasks)
+onMounted(() => {
+  loadTasks()
+  loadPlugins()
+})
 </script>
 
 <style scoped lang="scss">

@@ -63,6 +63,10 @@ public class SimulationTask {
     @TableField("error_msg")
     private String errorMsg;
 
+    /** 仿真执行进度（0-100），每 10 帧更新一次 */
+    @TableField("progress")
+    private Integer progress;
+
     @TableField("started_at")
     private OffsetDateTime startedAt;
 

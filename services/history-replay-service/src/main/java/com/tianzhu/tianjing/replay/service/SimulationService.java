@@ -2,6 +2,7 @@ package com.tianzhu.tianjing.replay.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.exception.ErrorCode;
 import com.tianzhu.tianjing.common.response.PageResult;
@@ -36,6 +37,8 @@ public class SimulationService {
 
     private final SimulationTaskMapper taskMapper;
     private final MinioClient minioClient;
+    private final SimulationExecutor simulationExecutor;
+    private final ObjectMapper objectMapper;
 
     @Value("${tianjing.minio.endpoint:http://localhost:9000}")
     private String minioEndpoint;
@@ -105,13 +108,27 @@ public class SimulationService {
         task.setTaskName(fileName);
         task.setVideoFileUrl(videoUrl);
         task.setWorkflowJson("{}");   // 仿真创建时暂无工作流配置，置空 JSON
-        task.setAlgoConfigJson("{}"); // 仿真创建时暂无算法配置，置空 JSON
+        // 存储推理插件和抽帧配置
+        String pluginId = (request.pluginId() != null && !request.pluginId().isBlank())
+                ? request.pluginId() : "CLOUD-PROXY-V1";
+        int frameFps = (request.frameFps() != null && request.frameFps() > 0)
+                ? request.frameFps() : 1;
+        try {
+            task.setAlgoConfigJson(objectMapper.writeValueAsString(
+                    Map.of("pluginId", pluginId, "frameFps", frameFps)));
+        } catch (Exception e) {
+            task.setAlgoConfigJson("{}");
+        }
         task.setStatus("PENDING");
         task.setStartedAt(OffsetDateTime.now());
         task.setCreatedBy(operator);
         task.setUpdatedBy(operator);
         taskMapper.insert(task);
-        log.info("创建仿真任务 task_id={} scene_id={}", task.getTaskId(), task.getSceneId());
+        log.info("创建仿真任务 task_id={} scene_id={} plugin={} fps={}", task.getTaskId(), task.getSceneId(), pluginId, frameFps);
+
+        // 触发仿真执行引擎（异步，虚拟线程）
+        simulationExecutor.executeAsync(task);
+
         return task;
     }
 

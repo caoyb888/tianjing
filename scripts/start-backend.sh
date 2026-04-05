@@ -218,6 +218,44 @@ stop_gateway() {
   fi
 }
 
+# ─── cloud-inference-proxy（Python FastAPI，端口 8092）────────────────────────
+
+CLOUD_INFER_DIR="$ROOT_DIR/inference/cloud-inference-proxy"
+UV_BIN="/home/xintong/.local/bin/uv"
+
+start_cloud_inference_proxy() {
+  if is_port_listening 8092; then
+    echo -e "  ${CYAN}跳过${RESET} cloud-inference-proxy — 端口 8092 已被占用（已运行）"
+    return 0
+  fi
+  if [ ! -f "$UV_BIN" ]; then
+    echo -e "  ${RED}跳过${RESET} cloud-inference-proxy — uv 未找到 ($UV_BIN)"
+    return 1
+  fi
+  local log="$LOG_DIR/cloud-inference-proxy.log"
+  (
+    cd "$CLOUD_INFER_DIR"
+    nohup "$UV_BIN" run \
+      --with "fastapi==0.110.0" \
+      --with "uvicorn[standard]==0.29.0" \
+      --with "pydantic==2.6.4" \
+      --with "numpy==1.26.4" \
+      --with "opencv-python-headless==4.9.0.80" \
+      --with "structlog==24.1.0" \
+      --with "httpx==0.27.0" \
+      python3 src/main.py > "$log" 2>&1 &
+    echo -e "  ${GREEN}已启动${RESET} cloud-inference-proxy  (PID=$!, port=8092, log=$log)"
+  )
+}
+
+stop_cloud_inference_proxy() {
+  local pid
+  pid=$(get_pid_on_port 8092)
+  if [ -n "$pid" ]; then
+    kill "$pid" 2>/dev/null && echo -e "  ${YELLOW}停止${RESET} cloud-inference-proxy (PID=$pid)" || true
+  fi
+}
+
 gateway_status() {
   local state
   state=$(docker inspect -f '{{.State.Running}}' tianjing-gateway 2>/dev/null || echo "missing")
@@ -264,6 +302,7 @@ case "$MODE" in
     for entry in "${SERVICES[@]}"; do
       stop_service "${entry%%:*}" "${entry##*:}"
     done
+    stop_cloud_inference_proxy
     stop_gateway
     echo -e "${GREEN}完成${RESET}"
     exit 0
@@ -285,6 +324,7 @@ case "$MODE" in
     for entry in "${SERVICES[@]}"; do
       stop_service "${entry%%:*}" "${entry##*:}"
     done
+    stop_cloud_inference_proxy
     stop_gateway
     sleep 2
     MODE="start"
@@ -300,9 +340,10 @@ case "$MODE" in
     ;;
 esac
 
-# ─── 启动网关 + 所有服务 ──────────────────────────────────────────────────────
-echo -e "\n${BOLD}▶ 启动 API 网关 + 后端服务...${RESET}"
+# ─── 启动网关 + 推理代理 + 所有服务 ─────────────────────────────────────────
+echo -e "\n${BOLD}▶ 启动 API 网关 + 推理代理 + 后端服务...${RESET}"
 start_gateway
+start_cloud_inference_proxy
 for entry in "${SERVICES[@]}"; do
   start_service "${entry%%:*}" "${entry##*:}"
 done

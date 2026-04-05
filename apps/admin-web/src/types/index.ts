@@ -174,6 +174,7 @@ export interface SimulationTask {
   taskName: string
   videoFileUrl: string          // 对应实体 videoFileUrl
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+  progress?: number             // 仿真执行进度 0-100，RUNNING 时有值
   totalFrames?: number
   matchedAlarms?: number
   falseAlarmCount?: number

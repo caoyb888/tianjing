@@ -10,9 +10,14 @@ export const simulationApi = {
 
   get: (taskId: string) => request.get(`/simulations/${taskId}`),
 
-  // 发送 snake_case 键名匹配后端 SimulationCreateRequest（scene_id / video_url）
-  create: (data: { sceneId: string; videoUrl: string }) =>
-    request.post('/simulations', { scene_id: data.sceneId, video_url: data.videoUrl }),
+  // 发送 snake_case 键名匹配后端 SimulationCreateRequest
+  create: (data: { sceneId: string; videoUrl: string; pluginId?: string; frameFps?: number }) =>
+    request.post('/simulations', {
+      scene_id:  data.sceneId,
+      video_url: data.videoUrl,
+      plugin_id: data.pluginId ?? 'CLOUD-PROXY-V1',
+      frame_fps: data.frameFps ?? 1,
+    }),
 
   cancel: (taskId: string) => request.post(`/simulations/${taskId}/cancel`),
 

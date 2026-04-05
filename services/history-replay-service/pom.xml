@@ -24,6 +24,19 @@
             <artifactId>minio</artifactId>
             <version>8.5.9</version>
         </dependency>
+        <!-- JavaCV：Java FFmpeg 绑定，用于仿真执行引擎视频抽帧 -->
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacv</artifactId>
+            <version>1.5.10</version>
+        </dependency>
+        <!-- FFmpeg 原生库（仅 Linux x86_64，开发/生产环境均为 Linux） -->
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>ffmpeg</artifactId>
+            <version>6.1.1-1.5.10</version>
+            <classifier>linux-x86_64</classifier>
+        </dependency>
     </dependencies>
     <build><plugins>
         <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>

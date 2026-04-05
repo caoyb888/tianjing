@@ -36,6 +36,8 @@ tianjing:
     endpoint: ${TIANJING_MINIO_ENDPOINT:http://localhost:9000}
     sim-bucket: tianjing-sim-temp
     datasets-bucket: tianjing-datasets
+  inference:
+    proxy-url: ${TIANJING_INFERENCE_PROXY_URL:http://localhost:8092}
 
 management:
   endpoints:
