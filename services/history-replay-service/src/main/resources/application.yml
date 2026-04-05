@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: history-replay-service
+  servlet:
+    multipart:
+      max-file-size: 2GB
+      max-request-size: 2GB
   datasource:
     url: ${TIANJING_POSTGRES_PROD_URL:jdbc:postgresql://localhost:5432/tianjing_prod}
     username: ${TIANJING_POSTGRES_PROD_USER:tianjing_app}

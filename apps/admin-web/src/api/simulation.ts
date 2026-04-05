@@ -37,6 +37,7 @@ export const simulationApi = {
     formData.append('scene_id', sceneId)
     return request.post('/simulations/upload-video', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0, // 视频上传不设超时，依赖上传进度判断
       onUploadProgress: (e) => {
         if (onProgress && e.total) {
           onProgress(Math.round((e.loaded * 100) / e.total))
