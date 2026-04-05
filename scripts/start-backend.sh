@@ -22,6 +22,10 @@ mkdir -p "$LOG_DIR"
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
+# ─── 本地代理绕过（宿主机若配置了 http_proxy，排除 localhost 避免 curl/shell 工具走代理）
+export no_proxy=localhost,127.0.0.1
+export NO_PROXY=localhost,127.0.0.1
+
 # ─── 本地开发环境变量（对应 deploy/docker/.env 中的实际值）──────────────────────
 export TIANJING_REDIS_HOST=localhost
 export TIANJING_REDIS_PORT=6379
