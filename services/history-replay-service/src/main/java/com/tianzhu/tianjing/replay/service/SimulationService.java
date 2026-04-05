@@ -104,6 +104,8 @@ public class SimulationService {
         task.setSceneId(request.sceneId());
         task.setTaskName(fileName);
         task.setVideoFileUrl(videoUrl);
+        task.setWorkflowJson("{}");   // 仿真创建时暂无工作流配置，置空 JSON
+        task.setAlgoConfigJson("{}"); // 仿真创建时暂无算法配置，置空 JSON
         task.setStatus("PENDING");
         task.setStartedAt(OffsetDateTime.now());
         task.setCreatedBy(operator);
