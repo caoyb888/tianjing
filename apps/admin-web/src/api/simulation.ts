@@ -16,6 +16,21 @@ export const simulationApi = {
 
   cancel: (taskId: string) => request.post(`/simulations/${taskId}/cancel`),
 
+  exportDataset: (taskId: string, data: {
+    datasetVersionId: string
+    datasetCode?: string
+    confThreshold?: number
+    includeNegatives?: boolean
+  }) => request.post(`/simulations/${taskId}/export-dataset`, {
+    dataset_version_id: data.datasetVersionId,
+    dataset_code: data.datasetCode,
+    conf_threshold: data.confThreshold ?? 0.7,
+    include_negatives: data.includeNegatives ?? true,
+  }),
+
+  getExportStatus: (taskId: string) =>
+    request.get(`/simulations/${taskId}/export-status`),
+
   uploadVideo: (file: File, sceneId: string, onProgress?: (percent: number) => void) => {
     const formData = new FormData()
     formData.append('file', file)

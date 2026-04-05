@@ -4,7 +4,10 @@ import com.tianzhu.tianjing.common.response.ApiResponse;
 import com.tianzhu.tianjing.common.response.PageResult;
 import com.tianzhu.tianjing.common.security.TianjingUserDetails;
 import com.tianzhu.tianjing.replay.domain.SimulationTask;
+import com.tianzhu.tianjing.replay.dto.DatasetExportRequest;
+import com.tianzhu.tianjing.replay.dto.DatasetExportStatusDTO;
 import com.tianzhu.tianjing.replay.dto.SimulationCreateRequest;
+import com.tianzhu.tianjing.replay.service.DatasetExportService;
 import com.tianzhu.tianjing.replay.service.SimulationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ import java.util.Map;
 public class SimulationController {
 
     private final SimulationService simulationService;
+    private final DatasetExportService datasetExportService;
 
     /** GET /simulations — 仿真任务列表 */
     @GetMapping
@@ -76,5 +80,31 @@ public class SimulationController {
             @AuthenticationPrincipal TianjingUserDetails user) {
         simulationService.cancelTask(taskId, user.getUsername());
         return ApiResponse.ok();
+    }
+
+    /**
+     * POST /simulations/{task_id}/export-dataset — 触发导出训练数据集
+     * 异步执行，立即返回 export_task_id；通过 export-status 轮询进度
+     */
+    @PostMapping("/{task_id}/export-dataset")
+    public ApiResponse<Map<String, String>> exportDataset(
+            @PathVariable("task_id") String taskId,
+            @Valid @RequestBody DatasetExportRequest request) {
+        SimulationTask task = simulationService.getTask(taskId);
+        datasetExportService.startExportAsync(task, request);
+        return ApiResponse.ok(Map.of(
+                "export_task_id", "EXP-" + taskId,
+                "dataset_version_id", request.datasetVersionId()
+        ));
+    }
+
+    /**
+     * GET /simulations/{task_id}/export-status — 查询导出进度
+     */
+    @GetMapping("/{task_id}/export-status")
+    public ApiResponse<DatasetExportStatusDTO> getExportStatus(
+            @PathVariable("task_id") String taskId) {
+        SimulationTask task = simulationService.getTask(taskId);
+        return ApiResponse.ok(datasetExportService.getExportStatus(task));
     }
 }

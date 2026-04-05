@@ -31,6 +31,7 @@ tianjing:
   minio:
     endpoint: ${TIANJING_MINIO_ENDPOINT:http://localhost:9000}
     sim-bucket: tianjing-sim-temp
+    datasets-bucket: tianjing-datasets
 
 management:
   endpoints:

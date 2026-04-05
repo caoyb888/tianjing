@@ -34,10 +34,10 @@ public class SimulationTask {
     @TableField("video_fps")
     private Integer videoFps;
 
-    @TableField("workflow_json")
+    @TableField(value = "workflow_json", typeHandler = com.tianzhu.tianjing.replay.config.JsonbTypeHandler.class)
     private String workflowJson;
 
-    @TableField("algo_config_json")
+    @TableField(value = "algo_config_json", typeHandler = com.tianzhu.tianjing.replay.config.JsonbTypeHandler.class)
     private String algoConfigJson;
 
     /** 状态：PENDING / RUNNING / COMPLETED / FAILED */
@@ -57,7 +57,7 @@ public class SimulationTask {
     @TableField("result_summary")
     private String resultSummary;
 
-    @TableField("result_json")
+    @TableField(value = "result_json", typeHandler = com.tianzhu.tianjing.replay.config.JsonbTypeHandler.class)
     private String resultJson;
 
     @TableField("error_msg")
@@ -74,6 +74,18 @@ public class SimulationTask {
 
     @TableField(value = "created_at", fill = FieldFill.INSERT) private OffsetDateTime createdAt;
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE) private OffsetDateTime updatedAt;
+
+    /** 导出的数据集版本 ID，导出成功后写入，用于溯源 */
+    @TableField("dataset_version_id")
+    private String datasetVersionId;
+
+    /** 数据集导出状态：NULL / EXPORTING / EXPORTED / EXPORT_FAILED */
+    @TableField("export_status")
+    private String exportStatus;
+
+    /** 导出结果摘要 JSON */
+    @TableField("export_result_json")
+    private String exportResultJson;
 
     @TableField("created_by")
     private String createdBy;
