@@ -26,6 +26,10 @@ CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 export no_proxy=localhost,127.0.0.1
 export NO_PROXY=localhost,127.0.0.1
 
+# ─── multipart 上传大小（覆盖 JAR 内 application.yml 默认 1MB 限制）─────────────
+export SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=2GB
+export SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=2GB
+
 # ─── 本地开发环境变量（对应 deploy/docker/.env 中的实际值）──────────────────────
 export TIANJING_REDIS_HOST=localhost
 export TIANJING_REDIS_PORT=6379
