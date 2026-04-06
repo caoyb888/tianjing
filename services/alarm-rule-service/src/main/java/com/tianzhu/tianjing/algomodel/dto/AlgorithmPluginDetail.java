@@ -25,7 +25,11 @@ public record AlgorithmPluginDetail(
         String inferBackend,
         List<String> supportedScenes,
         Map<String, Object> accuracyMetrics,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        /** 算法简要描述 */
+        String description,
+        /** 适合的业务维度 */
+        String businessDimension
 ) {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .findAndRegisterModules();
@@ -76,7 +80,9 @@ public record AlgorithmPluginDetail(
                 p.getInferBackend(),
                 scenes,
                 accuracy,
-                p.getCreatedAt()
+                p.getCreatedAt(),
+                p.getDescription(),
+                p.getBusinessDimension()
         );
     }
 }

@@ -140,6 +140,8 @@ export interface AlgorithmPlugin {
     map50_95?: number
     inferenceMs: number
   }
+  description?: string           // 算法简要描述
+  businessDimension?: string     // 适合的业务维度
 }
 
 // 模型版本

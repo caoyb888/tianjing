@@ -53,6 +53,14 @@ public class AlgorithmPlugin {
     @TableField("current_model_version_id")
     private String currentModelVersionId;
 
+    /** 算法简要描述，DB列名 description */
+    @TableField("description")
+    private String description;
+
+    /** 适合的业务维度：设备状态监测 / 工艺参数监控 / 质量检测 / 通用，DB列名 business_dimension */
+    @TableField("business_dimension")
+    private String businessDimension;
+
     @TableField(value = "version_lock") @Version private Integer versionLock;
 
     @TableLogic private Boolean isDeleted;

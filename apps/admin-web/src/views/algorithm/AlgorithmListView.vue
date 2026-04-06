@@ -17,9 +17,13 @@
         <el-card shadow="hover" class="plugin-card" @click="$router.push(`/algorithms/${plugin.pluginId}`)">
           <div class="plugin-header">
             <el-tag size="small" type="info">{{ plugin.type }}</el-tag>
+            <el-tag v-if="plugin.businessDimension" size="small" :type="dimensionTagType(plugin.businessDimension)" style="margin-left:4px">
+              {{ plugin.businessDimension }}
+            </el-tag>
             <span class="plugin-version">v{{ plugin.version }}</span>
           </div>
-          <h3 class="plugin-name">{{ plugin.pluginId }}</h3>
+          <h3 class="plugin-name">{{ plugin.name || plugin.pluginId }}</h3>
+          <p v-if="plugin.description" class="plugin-desc">{{ plugin.description }}</p>
           <div class="plugin-metrics">
             <div class="metric">
               <span class="label">mAP@50</span>
@@ -155,6 +159,14 @@ async function submitRegister() {
   }
 }
 
+function dimensionTagType(dim: string | undefined): 'success' | 'warning' | 'danger' | '' {
+  if (!dim) return ''
+  if (dim.includes('设备')) return 'warning'
+  if (dim.includes('质量')) return 'danger'
+  if (dim.includes('工艺')) return 'success'
+  return ''
+}
+
 async function loadPlugins() {
   loading.value = true
   try {
@@ -182,7 +194,17 @@ onMounted(loadPlugins)
   margin-bottom: 8px;
 }
 .plugin-version { font-size: 12px; color: #909399; }
-.plugin-name { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #303133; }
+.plugin-name { font-size: 14px; font-weight: 600; margin: 8px 0 4px; color: #303133; }
+.plugin-desc {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.5;
+  margin: 0 0 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .plugin-metrics {
   display: flex;
   gap: 16px;
