@@ -38,8 +38,34 @@
     <!-- 新建任务对话框 -->
     <el-dialog v-model="showCreate" title="新建仿真任务" width="620px" :close-on-click-modal="false">
       <el-form :model="createForm" label-width="120px">
-        <el-form-item label="目标场景 ID" required>
-          <el-input v-model="createForm.sceneId" placeholder="如：SCENE-SINTER-005" />
+        <el-form-item label="目标场景" required>
+          <el-select
+            v-model="createForm.sceneId"
+            placeholder="请选择场景"
+            filterable
+            :loading="scenesLoading"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="s in sceneOptions"
+              :key="s.sceneId"
+              :value="s.sceneId"
+              :label="`${s.sceneId}${s.sceneName && s.sceneName !== s.sceneId ? '  ' + s.sceneName : ''}`"
+            >
+              <div style="display:flex; justify-content:space-between; align-items:center">
+                <span>{{ s.sceneId }}</span>
+                <span style="font-size:12px; color:#909399; margin-left:12px">
+                  {{ [s.factory, s.category].filter(Boolean).join(' · ') }}
+                </span>
+              </div>
+            </el-option>
+            <!-- 场景列表为空时的兜底：允许直接输入 -->
+            <template v-if="sceneOptions.length === 0 && !scenesLoading" #empty>
+              <div style="padding:8px 12px; color:#909399; font-size:13px">
+                暂无场景数据，请先在场景管理中创建场景
+              </div>
+            </template>
+          </el-select>
         </el-form-item>
         <el-form-item label="推理插件">
           <el-select v-model="createForm.pluginId" style="width: 100%">
@@ -129,6 +155,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { simulationApi } from '@/api/simulation'
 import { algorithmApi } from '@/api/algorithm'
+import { sceneApi } from '@/api/scene'
 import { formatDateTime } from '@/utils/format'
 import type { SimulationTask } from '@/types'
 
@@ -157,6 +184,35 @@ const createForm = reactive({
 const pluginOptions = ref<{ pluginId: string; name: string }[]>([
   { pluginId: 'CLOUD-PROXY-V1', name: 'CLOUD-PROXY-V1（云端推理代理）' }
 ])
+
+interface SceneOption {
+  sceneId: string
+  sceneName: string
+  factory: string
+  category: string
+  status: string
+}
+const sceneOptions = ref<SceneOption[]>([])
+const scenesLoading = ref(false)
+
+async function loadScenes() {
+  scenesLoading.value = true
+  try {
+    const res = await sceneApi.list({ page: 1, size: 200, status: 'active' })
+    const items = res.data?.data?.items ?? []
+    sceneOptions.value = items.map((s: any) => ({
+      sceneId:   s.sceneId   ?? s.scene_id,
+      sceneName: s.sceneName ?? s.scene_name ?? s.sceneId ?? s.scene_id,
+      factory:   s.factory   ?? '',
+      category:  s.category  ?? '',
+      status:    s.status    ?? '',
+    }))
+  } catch {
+    // 加载失败不阻断，选项为空时用户可手动输入降级处理
+  } finally {
+    scenesLoading.value = false
+  }
+}
 
 function openCreate() {
   createForm.sceneId = ''
@@ -251,6 +307,7 @@ async function cancelTask(taskId: string) {
 onMounted(() => {
   loadTasks()
   loadPlugins()
+  loadScenes()
 })
 </script>
 
