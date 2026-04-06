@@ -30,17 +30,20 @@ public record SceneConfigDetail(
         OffsetDateTime updatedAt,
         String createdBy
 ) {
-    public static SceneConfigDetail from(SceneConfig s) {
-        // workflow_json 存储为 JSON 字符串，反序列化为 Object 返回给前端
-        Object workflowObj = null;
-        if (s.getWorkflowJson() != null) {
-            try {
-                workflowObj = new com.fasterxml.jackson.databind.ObjectMapper()
-                        .readValue(s.getWorkflowJson(), Object.class);
-            } catch (Exception ignored) {
-                workflowObj = s.getWorkflowJson();
-            }
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** 将 JSONB 字符串安全反序列化为 Object；失败时原样返回字符串 */
+    private static Object parseJson(String raw) {
+        if (raw == null) return null;
+        try {
+            return MAPPER.readValue(raw, Object.class);
+        } catch (Exception ignored) {
+            return raw;
         }
+    }
+
+    public static SceneConfigDetail from(SceneConfig s) {
         return new SceneConfigDetail(
                 s.getSceneId(), s.getSceneName(),
                 normalizeFactory(s.getFactoryCode()),
@@ -50,8 +53,9 @@ public record SceneConfigDetail(
                 s.getStatus() != null ? s.getStatus().toLowerCase() : null,
                 s.getBoundDeviceCode(), s.getActiveModelVersionId(), s.getActivePluginId(),
                 s.getFrameInterval(),
-                s.getAlarmConfigJson(), s.getAlgoParamsJson(),
-                workflowObj,
+                parseJson(s.getAlarmConfigJson()),
+                parseJson(s.getAlgoParamsJson()),
+                parseJson(s.getWorkflowJson()),
                 s.getVersion(),
                 s.getCreatedAt(), s.getUpdatedAt(), s.getCreatedBy()
         );
