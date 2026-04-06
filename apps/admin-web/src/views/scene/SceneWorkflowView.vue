@@ -120,11 +120,33 @@
           </template>
 
           <!-- 推理节点特有属性 -->
-          <template v-if="selectedNode.type === 'inference'">
-            <el-form-item label="插件ID">
-              <el-input v-model="selectedNode.data.plugin_id" @change="updateNodeData" />
+          <template v-if="selectedNode.type === 'inference' || selectedNode.type === 'measurement'">
+            <el-form-item label="算法插件">
+              <el-select
+                v-model="selectedNode.data.plugin_id"
+                filterable
+                placeholder="选择算法插件"
+                style="width:100%"
+                @change="updateNodeData"
+              >
+                <el-option-group
+                  v-for="group in pluginOptionGroups"
+                  :key="group.label"
+                  :label="group.label"
+                >
+                  <el-option
+                    v-for="opt in group.options"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  >
+                    <span style="font-size:12px">{{ opt.label }}</span>
+                    <span style="float:right;font-size:11px;color:#c0c4cc">{{ opt.value }}</span>
+                  </el-option>
+                </el-option-group>
+              </el-select>
             </el-form-item>
-            <el-form-item label="置信阈值">
+            <el-form-item v-if="selectedNode.type === 'inference'" label="置信阈值">
               <el-input-number v-model="selectedNode.data.conf_threshold" :min="0" :max="1" :step="0.05" :precision="2" style="width:100%" @change="updateNodeData" />
             </el-form-item>
           </template>
@@ -202,6 +224,7 @@ import { ElMessage } from 'element-plus'
 import WorkflowNode from '@/components/business/WorkflowNode.vue'
 import { sceneApi } from '@/api/scene'
 import { deviceApi } from '@/api/device'
+import { algorithmApi } from '@/api/algorithm'
 
 const route = useRoute()
 const sceneId = route.params.sceneId as string
@@ -213,6 +236,42 @@ const selectedNode = ref<Node | null>(null)
 
 // 摄像头设备列表（供视频源节点选择）
 const cameraOptions = ref<{ label: string; value: string }[]>([])
+
+// 算法插件列表（按类型分组，供推理节点选择）
+interface PluginOption { label: string; value: string }
+interface PluginOptionGroup { label: string; options: PluginOption[] }
+const pluginOptionGroups = ref<PluginOptionGroup[]>([])
+
+const TYPE_LABELS: Record<string, string> = {
+  detection:      '目标检测',
+  segmentation:   '语义分割',
+  classification: '图像分类',
+  measurement:    '几何测量',
+  enhancement:    '图像增强',
+}
+
+async function loadPluginOptions() {
+  try {
+    const res = await algorithmApi.list({ size: 100 })
+    const items: any[] = res.data?.data?.items ?? res.data?.items ?? []
+    // 按 plugin_type 分组
+    const groupMap: Record<string, PluginOption[]> = {}
+    for (const p of items) {
+      const type: string = p.type ?? p.pluginType ?? 'OTHER'
+      if (!groupMap[type]) groupMap[type] = []
+      groupMap[type].push({
+        label: p.name ?? p.pluginName ?? p.plugin_id,
+        value: p.pluginId ?? p.plugin_id,
+      })
+    }
+    pluginOptionGroups.value = Object.entries(groupMap).map(([type, options]) => ({
+      label: TYPE_LABELS[type] ?? type,
+      options,
+    }))
+  } catch {
+    // 加载失败不阻断编排器使用
+  }
+}
 
 async function loadCameraOptions() {
   try {
@@ -384,6 +443,7 @@ async function saveWorkflow() {
 onMounted(() => {
   loadWorkflow()
   loadCameraOptions()
+  loadPluginOptions()
 })
 </script>
 
