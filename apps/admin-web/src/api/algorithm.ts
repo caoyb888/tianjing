@@ -11,4 +11,6 @@ export const algorithmApi = {
   get: (pluginId: string) => request.get(`/algorithms/${pluginId}`),
 
   register: (data: Record<string, unknown>) => request.post('/algorithms', data),
+
+  healthCheck: (pluginId: string) => request.get(`/algorithms/${pluginId}/health-check`),
 }

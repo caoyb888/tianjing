@@ -28,6 +28,8 @@ mybatis-plus:
 tianjing:
   jwt:
     public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
+  inference:
+    proxy-url: ${TIANJING_INFERENCE_PROXY_URL:http://localhost:8092}
 
 management:
   endpoints:

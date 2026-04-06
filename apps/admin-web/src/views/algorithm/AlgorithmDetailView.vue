@@ -1,13 +1,43 @@
 <template>
   <div class="algorithm-detail" v-loading="loading">
     <PageHeader
-      :title="plugin?.pluginId || '插件详情'"
-      :description="`算法插件 · 版本 v${plugin?.version}`"
+      :title="plugin?.name || plugin?.pluginId || '插件详情'"
+      :description="`${plugin?.pluginId} · 版本 v${plugin?.version}`"
     >
       <template #actions>
+        <el-button
+          type="primary"
+          :loading="checking"
+          :icon="checking ? undefined : Monitor"
+          @click="runHealthCheck"
+        >{{ checking ? '检测中…' : '检测可用性' }}</el-button>
         <el-button @click="$router.back()">返回</el-button>
       </template>
     </PageHeader>
+
+    <!-- 检测结果横幅 -->
+    <el-alert
+      v-if="healthResult"
+      :type="healthResult.available ? 'success' : 'error'"
+      :closable="true"
+      show-icon
+      style="margin-bottom: 16px"
+      @close="healthResult = null"
+    >
+      <template #title>
+        <span v-if="healthResult.available">
+          ✅ 算法可用 — 推理代理响应 {{ healthResult.responseMs }}ms
+          <el-tag v-if="healthResult.backend" size="small" type="info" style="margin-left:8px">{{ healthResult.backend }}</el-tag>
+        </span>
+        <span v-else>❌ 算法不可用 — {{ healthResult.message }}</span>
+      </template>
+      <div v-if="healthResult.available" style="font-size:13px; color:#606266; margin-top:4px">
+        {{ healthResult.message }}
+      </div>
+      <div style="font-size:11px; color:#909399; margin-top:4px">
+        检测时间：{{ formatDateTime(healthResult.checkedAt) }}
+      </div>
+    </el-alert>
 
     <el-row :gutter="16" v-if="plugin">
       <el-col :md="12">
@@ -68,15 +98,26 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { Monitor } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { algorithmApi } from '@/api/algorithm'
+import { formatDateTime } from '@/utils/format'
 import type { AlgorithmPlugin } from '@/types'
 
 const route = useRoute()
 const pluginId = route.params.pluginId as string
-const plugin = ref<AlgorithmPlugin | null>(null)
+const plugin  = ref<AlgorithmPlugin | null>(null)
 const loading = ref(false)
+const checking = ref(false)
+const healthResult = ref<{
+  available: boolean
+  responseMs: number
+  message: string
+  backend: string | null
+  checkedAt: string
+} | null>(null)
 
 function dimensionTagType(dim: string | undefined): 'success' | 'warning' | 'danger' | '' {
   if (!dim) return ''
@@ -84,6 +125,24 @@ function dimensionTagType(dim: string | undefined): 'success' | 'warning' | 'dan
   if (dim.includes('质量')) return 'danger'
   if (dim.includes('工艺')) return 'success'
   return ''
+}
+
+async function runHealthCheck() {
+  checking.value = true
+  healthResult.value = null
+  try {
+    const res = await algorithmApi.healthCheck(pluginId)
+    healthResult.value = res.data.data
+    if (res.data.data.available) {
+      ElMessage.success('算法可用，推理代理响应正常')
+    } else {
+      ElMessage.warning('算法不可用，请查看检测结果')
+    }
+  } catch {
+    ElMessage.error('检测请求失败，请稍后重试')
+  } finally {
+    checking.value = false
+  }
 }
 
 async function loadPlugin() {
