@@ -17,6 +17,15 @@
             <el-descriptions-item label="插件ID">{{ plugin.pluginId }}</el-descriptions-item>
             <el-descriptions-item label="版本号">v{{ plugin.version }}</el-descriptions-item>
             <el-descriptions-item label="类型">{{ plugin.type }}</el-descriptions-item>
+            <el-descriptions-item label="业务维度">
+              <el-tag v-if="plugin.businessDimension" :type="dimensionTagType(plugin.businessDimension)" size="small">
+                {{ plugin.businessDimension }}
+              </el-tag>
+              <span v-else style="color:#c0c4cc">—</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="算法描述">
+              <span style="white-space: pre-wrap; line-height: 1.6">{{ plugin.description || '—' }}</span>
+            </el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>
@@ -68,6 +77,14 @@ const route = useRoute()
 const pluginId = route.params.pluginId as string
 const plugin = ref<AlgorithmPlugin | null>(null)
 const loading = ref(false)
+
+function dimensionTagType(dim: string | undefined): 'success' | 'warning' | 'danger' | '' {
+  if (!dim) return ''
+  if (dim.includes('设备')) return 'warning'
+  if (dim.includes('质量')) return 'danger'
+  if (dim.includes('工艺')) return 'success'
+  return ''
+}
 
 async function loadPlugin() {
   loading.value = true
