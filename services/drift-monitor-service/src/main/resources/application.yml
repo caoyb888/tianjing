@@ -50,8 +50,8 @@ tianjing:
     platform-callback-url: ${TIANJING_TRAIN_CALLBACK_URL:http://host.docker.internal:8089}
     # MinIO 连接配置（训练容器下载数据集用）
     minio-endpoint: ${TIANJING_MINIO_ENDPOINT:localhost:9000}
-    minio-access-key: ${MINIO_ACCESS_KEY:minioadmin}
-    minio-secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    minio-access-key: ${TIANJING_MINIO_ACCESS_KEY:minioadmin}
+    minio-secret-key: ${TIANJING_MINIO_SECRET_KEY:minioadmin}
     # MLflow Tracking Server（训练环境，生产环境不配置此项）
     mlflow-tracking-uri: ${TIANJING_MLFLOW_TRACKING_URI:http://localhost:5000}
 

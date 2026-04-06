@@ -50,6 +50,17 @@ public class DockerTrainJobLauncher {
         // 容器名：去除下划线，全小写，确保符合 Docker 命名规范
         String containerName = "train-" + job.getJobId().toLowerCase().replace("_", "-");
 
+        // 容器内无法用 localhost/127.0.0.1 访问宿主机，统一替换为 host.docker.internal
+        String containerMinioEndpoint = minioEndpoint
+                .replace("localhost", "host.docker.internal")
+                .replace("127.0.0.1", "host.docker.internal");
+        String containerCallbackUrl = platformCallbackUrl
+                .replace("localhost", "host.docker.internal")
+                .replace("127.0.0.1", "host.docker.internal");
+        String containerMlflowUri = mlflowTrackingUri
+                .replace("localhost", "host.docker.internal")
+                .replace("127.0.0.1", "host.docker.internal");
+
         List<String> cmd = new ArrayList<>(List.of(
             "docker", "run", "--rm", "-d",
             "--name", containerName,
@@ -59,12 +70,12 @@ public class DockerTrainJobLauncher {
             "-e", "PLUGIN_ID="           + job.getPluginId(),
             "-e", "DATASET_VERSION_ID="  + job.getDatasetVersionId(),
             "-e", "TRAIN_CONFIG_JSON="   + job.getTrainConfigJson(),
-            "-e", "MINIO_ENDPOINT="      + minioEndpoint,
+            "-e", "MINIO_ENDPOINT="      + containerMinioEndpoint,
             "-e", "MINIO_ACCESS_KEY="    + minioAccessKey,
             "-e", "MINIO_SECRET_KEY="    + minioSecretKey,
-            "-e", "MLFLOW_TRACKING_URI=" + mlflowTrackingUri,
+            "-e", "MLFLOW_TRACKING_URI=" + containerMlflowUri,
             // 回调地址：训练脚本向此地址汇报 RUNNING/COMPLETED/FAILED
-            "-e", "PLATFORM_CALLBACK_URL=" + platformCallbackUrl,
+            "-e", "PLATFORM_CALLBACK_URL=" + containerCallbackUrl,
             trainerImage
         ));
 

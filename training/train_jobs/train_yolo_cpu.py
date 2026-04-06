@@ -69,10 +69,17 @@ PLUGIN_ID            = _require_env("PLUGIN_ID")
 DATASET_VERSION_ID   = _require_env("DATASET_VERSION_ID")
 PLATFORM_CALLBACK_URL = os.environ.get("PLATFORM_CALLBACK_URL", "http://host.docker.internal:8089")
 MODEL_REGISTER_URL   = os.environ.get("MODEL_REGISTER_URL", "http://host.docker.internal:8086")
-MINIO_ENDPOINT       = os.environ.get("MINIO_ENDPOINT", "localhost:9000")
+_minio_raw           = os.environ.get("MINIO_ENDPOINT", "localhost:9000")
+# Minio SDK 只接受 host:port，不接受含 http:// 前缀的 URL
+MINIO_ENDPOINT       = _minio_raw.removeprefix("https://").removeprefix("http://").rstrip("/")
+# 原始 URL 含 https:// 则 secure=True，含 http:// 或无前缀则 secure=False
+MINIO_SECURE         = _minio_raw.startswith("https://")
 MINIO_ACCESS_KEY     = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY     = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
 MLFLOW_TRACKING_URI  = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
+# 立即清空环境变量，防止 Ultralytics 在 model.train() 中自动启用 MLflow autolog
+# 步骤 6 的 log_to_mlflow() 会在调用时通过 mlflow.set_tracking_uri() 恢复
+os.environ["MLFLOW_TRACKING_URI"] = ""
 
 # 解析训练超参
 _cfg_raw = os.environ.get("TRAIN_CONFIG_JSON", "{}")
@@ -140,7 +147,7 @@ def _register_model(mlflow_run_id: str, model_artifact_url: str, version_tag: st
 # ──────────────────────────────────────────
 def download_dataset():
     log.info("正在从 MinIO 下载数据集 %s/%s/dataset.zip", DATASET_BUCKET, DATASET_VERSION_ID)
-    minio_secure = not MINIO_ENDPOINT.startswith("localhost") and not MINIO_ENDPOINT.startswith("127.")
+    minio_secure = MINIO_SECURE
     client = Minio(MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY,
                    secret_key=MINIO_SECRET_KEY, secure=minio_secure)
 
@@ -347,7 +354,7 @@ def export_onnx(best_weights: Path) -> Path:
 # 步骤 5：上传模型到 MinIO
 # ──────────────────────────────────────────
 def upload_model_to_minio(onnx_path: Path) -> str:
-    minio_secure = not MINIO_ENDPOINT.startswith("localhost") and not MINIO_ENDPOINT.startswith("127.")
+    minio_secure = MINIO_SECURE
     client = Minio(MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY,
                    secret_key=MINIO_SECRET_KEY, secure=minio_secure)
 

@@ -3,14 +3,17 @@
 # 构建：docker build -t tianjing/yolo-trainer:cpu-latest training/train_jobs/
 # 运行：由 DockerTrainJobLauncher 自动调用，无需手动执行
 
-FROM python:3.11.8-slim-bookworm
+FROM docker.m.daocloud.io/library/python:3.11-slim
 
 # 时区
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # 系统依赖（OpenCV 无头模式依赖的最小 so 库）
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt 使用阿里云源加速
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true && \
+    apt-get update && apt-get install -y --no-install-recommends \
         libglib2.0-0 \
         libgomp1 \
         libgl1 \
@@ -22,7 +25,10 @@ WORKDIR /app
 
 # 安装 Python 依赖（分两层：依赖层 + 脚本层，加速重复构建）
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
+    -r requirements.txt
 
 # 预下载 YOLOv8n 预训练权重（构建时缓存，避免训练时联网）
 RUN python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
