@@ -3,7 +3,9 @@ package com.tianzhu.tianjing.replay.service;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tianzhu.tianjing.replay.domain.SimulationTask;
+import com.tianzhu.tianjing.replay.domain.SimulationVideo;
 import com.tianzhu.tianjing.replay.repository.SimulationTaskMapper;
+import com.tianzhu.tianjing.replay.repository.SimulationVideoMapper;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -39,6 +41,7 @@ import java.util.List;
 public class SimulationExecutor {
 
     private final SimulationTaskMapper taskMapper;
+    private final SimulationVideoMapper videoMapper;
     private final MinioClient minioClient;
     private final InferenceClient inferenceClient;
     private final ObjectMapper objectMapper;
@@ -111,9 +114,13 @@ public class SimulationExecutor {
             task.setStatus("COMPLETED");
             task.setFinishedAt(OffsetDateTime.now());
             task.setTotalFrames(frameResults.size());
+            task.setMatchedAlarms(detectionFrames);
             task.setResultJson(objectMapper.writeValueAsString(resultJson));
             task.setProgress(100);
             taskMapper.updateById(task);
+
+            // 同步更新 simulation_video 第一条记录的统计字段
+            updateVideoStats(taskId, frameResults.size(), detectionFrames, "COMPLETED", null);
 
             log.info("仿真完成 task_id={} 总帧数={} 检测帧={}", taskId, frameResults.size(), detectionFrames);
 
@@ -211,15 +218,37 @@ public class SimulationExecutor {
 
     private void markFailed(SimulationTask task, String errorMsg) {
         try {
-            task.setStatus("FAILED");
-            task.setErrorMsg(errorMsg != null
+            String truncatedMsg = errorMsg != null
                     ? errorMsg.substring(0, Math.min(errorMsg.length(), 500))
-                    : "未知错误");
+                    : "未知错误";
+            task.setStatus("FAILED");
+            task.setErrorMsg(truncatedMsg);
             task.setFinishedAt(OffsetDateTime.now());
             task.setProgress(0);
             taskMapper.updateById(task);
+            // 同步更新视频记录为 FAILED
+            updateVideoStats(task.getTaskId(), 0, 0, "FAILED", truncatedMsg);
         } catch (Exception e) {
             log.error("写入 FAILED 状态失败 task_id={}", task.getTaskId(), e);
+        }
+    }
+
+    /** 将仿真结果回写到 simulation_video 第一条记录（sortOrder=0 的主视频） */
+    private void updateVideoStats(String taskId, int totalFrames, int matchedAlarms,
+                                  String status, String errorMsg) {
+        try {
+            List<SimulationVideo> videos = videoMapper.selectByTaskId(taskId);
+            if (videos.isEmpty()) return;
+            SimulationVideo v = videos.get(0);
+            v.setTotalFrames(totalFrames);
+            v.setMatchedAlarms(matchedAlarms);
+            v.setStatus(status);
+            v.setErrorMsg(errorMsg);
+            videoMapper.updateById(v);
+            log.debug("已更新 simulation_video task_id={} status={} frames={} alarms={}",
+                    taskId, status, totalFrames, matchedAlarms);
+        } catch (Exception e) {
+            log.warn("更新 simulation_video 统计失败 task_id={}: {}", taskId, e.getMessage());
         }
     }
 
