@@ -11,9 +11,10 @@ import com.tianzhu.tianjing.replay.repository.SimulationTaskMapper;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -29,12 +30,22 @@ import java.util.zip.ZipOutputStream;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class DatasetExportService {
 
     private final SimulationTaskMapper taskMapper;
     private final MinioClient minioClient;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate trainJdbcTemplate;
+
+    public DatasetExportService(SimulationTaskMapper taskMapper,
+                                MinioClient minioClient,
+                                ObjectMapper objectMapper,
+                                @Qualifier("trainJdbcTemplate") JdbcTemplate trainJdbcTemplate) {
+        this.taskMapper       = taskMapper;
+        this.minioClient      = minioClient;
+        this.objectMapper     = objectMapper;
+        this.trainJdbcTemplate = trainJdbcTemplate;
+    }
 
     @Value("${tianjing.minio.sim-bucket:tianjing-sim-temp}")
     private String simBucket;
@@ -275,17 +286,22 @@ public class DatasetExportService {
         // 7. 清理临时文件
         deleteRecursively(tmpDir);
 
-        // 8. 更新 simulation_task 状态
+        // 8. 写入 tianjing_train.dataset / dataset_version
         int annotationCount = cocoAnnotations.size();
+        int exportedFrames  = filtered.size();
+        String minioPrefix  = req.datasetVersionId() + "/";
+        upsertTrainDataset(task, req, exportedFrames, annotationCount, minioPrefix);
+
+        // 9. 更新 simulation_task 状态
         ExportResult exportResult = new ExportResult(
-                totalFrames, filtered.size(), annotationCount, minioPath, null);
+                totalFrames, exportedFrames, annotationCount, minioPath, null);
         task.setExportStatus("EXPORTED");
         task.setExportResultJson(objectMapper.writeValueAsString(exportResult));
         taskMapper.updateById(task);
         progressMap.put(taskId, 100);
 
         log.info("导出完成 task_id={} frames={} annotations={} path={}",
-                taskId, filtered.size(), annotationCount, minioPath);
+                taskId, exportedFrames, annotationCount, minioPath);
     }
 
     private void downloadFrameToFile(String frameUrl, Path destPath) throws Exception {
@@ -297,6 +313,62 @@ public class DatasetExportService {
                 .object(objectKey)
                 .build())) {
             Files.copy(is, destPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    /**
+     * 在 tianjing_train 库中 upsert dataset + dataset_version 记录。
+     * - dataset 不存在时自动创建（source_type = LAB_REPLAY）
+     * - dataset_version 不存在时 INSERT；存在时更新 sample_count
+     */
+    private void upsertTrainDataset(SimulationTask task, DatasetExportRequest req,
+                                    int sampleCount, int annotationCount, String minioPrefix) {
+        String datasetCode    = req.datasetCode() != null ? req.datasetCode() : "DS-SIM-" + task.getSceneId();
+        String versionId      = req.datasetVersionId();
+        String createdBy      = task.getCreatedBy() != null ? task.getCreatedBy() : "system";
+        String datasetMinio   = datasetCode + "/";
+
+        try {
+            // 1. 确保 dataset 存在
+            Integer exists = trainJdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM dataset WHERE dataset_code = ?", Integer.class, datasetCode);
+            if (exists == null || exists == 0) {
+                trainJdbcTemplate.update(
+                        "INSERT INTO dataset(dataset_code, dataset_name, scene_id, factory_code, " +
+                        "source_type, minio_prefix, created_by, updated_by) VALUES(?,?,?,?,'LAB_REPLAY',?,?,?)",
+                        datasetCode,
+                        "仿真导出数据集-" + task.getSceneId(),
+                        task.getSceneId(),
+                        "UNKNOWN",
+                        datasetMinio,
+                        createdBy, createdBy);
+                log.info("自动创建 dataset dataset_code={}", datasetCode);
+            }
+            // 2. 更新 dataset 样本统计
+            trainJdbcTemplate.update(
+                    "UPDATE dataset SET total_samples = total_samples + ?, updated_by = ?, updated_at = NOW() " +
+                    "WHERE dataset_code = ?",
+                    sampleCount, createdBy, datasetCode);
+
+            // 3. upsert dataset_version
+            Integer vExists = trainJdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM dataset_version WHERE version_id = ?", Integer.class, versionId);
+            if (vExists == null || vExists == 0) {
+                trainJdbcTemplate.update(
+                        "INSERT INTO dataset_version(version_id, dataset_code, version_tag, " +
+                        "sample_count, minio_prefix, created_by) VALUES(?,?,?,?,?,?)",
+                        versionId, datasetCode, "sim-export", sampleCount, minioPrefix, createdBy);
+                log.info("创建 dataset_version version_id={} sample_count={}", versionId, sampleCount);
+            } else {
+                trainJdbcTemplate.update(
+                        "UPDATE dataset_version SET sample_count = ? WHERE version_id = ?",
+                        sampleCount, versionId);
+                log.info("更新 dataset_version version_id={} sample_count={}", versionId, sampleCount);
+            }
+        } catch (Exception e) {
+            // 写入训练库失败不影响主链路（仅记录警告）
+            log.warn("写入 tianjing_train 失败，数据集版本记录未同步 versionId={} error={}",
+                    versionId, e.getMessage());
         }
     }
 

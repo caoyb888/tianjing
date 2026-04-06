@@ -32,6 +32,10 @@ mybatis-plus:
 tianjing:
   jwt:
     public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
+  train-db:
+    url: ${TIANJING_POSTGRES_TRAIN_URL:jdbc:postgresql://localhost:5432/tianjing_train}
+    username: ${TIANJING_POSTGRES_TRAIN_USER:tianjing_train_user}
+    password: ${TIANJING_POSTGRES_TRAIN_PASSWORD:}
   minio:
     endpoint: ${TIANJING_MINIO_ENDPOINT:http://localhost:9000}
     sim-bucket: tianjing-sim-temp
