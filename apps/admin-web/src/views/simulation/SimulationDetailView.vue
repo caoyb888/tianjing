@@ -20,9 +20,6 @@
           <el-descriptions :column="1" border>
             <el-descriptions-item label="任务ID">{{ task.taskId }}</el-descriptions-item>
             <el-descriptions-item label="场景">{{ task.sceneId }}</el-descriptions-item>
-            <el-descriptions-item label="视频文件">
-              <el-text truncated style="max-width: 220px">{{ task.videoFileUrl }}</el-text>
-            </el-descriptions-item>
             <el-descriptions-item label="状态"><StatusBadge :status="task.status" /></el-descriptions-item>
             <el-descriptions-item label="创建时间">{{ formatDateTime(task.createdAt) }}</el-descriptions-item>
             <el-descriptions-item v-if="task.finishedAt" label="完成时间">
@@ -36,20 +33,88 @@
           <template #header><span class="card-title">推理进度</span></template>
           <div style="padding: 20px 0">
             <el-progress
-              :percentage="task.status === 'COMPLETED' ? 100 : task.status === 'FAILED' ? 100 : 0"
+              :percentage="task.status === 'COMPLETED' ? 100 : task.status === 'FAILED' ? 100 : task.progress ?? 0"
               :stroke-width="20"
               :status="task.status === 'FAILED' ? 'exception' : task.status === 'COMPLETED' ? 'success' : undefined"
             />
           </div>
           <el-result
-            v-if="task.status === 'failed'"
+            v-if="task.status === 'FAILED'"
             icon="error"
             title="仿真失败"
-            sub-title="请检查视频文件格式或联系管理员"
+            :sub-title="task.errorMsg || '请检查视频文件格式或联系管理员'"
           />
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 视频列表 -->
+    <el-card shadow="never" style="margin-top: 16px" v-if="task">
+      <template #header>
+        <div style="display:flex; align-items:center; justify-content:space-between">
+          <span class="card-title">视频列表（{{ (task.videos ?? []).length }} 个）</span>
+          <el-button
+            v-if="task.status === 'PENDING' || task.status === 'RUNNING'"
+            size="small"
+            :icon="Plus"
+            @click="showAddVideo = true"
+          >追加视频</el-button>
+        </div>
+      </template>
+      <el-table :data="task.videos ?? []" size="small" style="width: 100%">
+        <el-table-column label="序号" prop="sortOrder" width="60" />
+        <el-table-column label="文件名" prop="videoName" min-width="160" show-overflow-tooltip />
+        <el-table-column label="类型" width="110">
+          <template #default="{ row }">
+            <el-tag
+              size="small"
+              :type="row.label === 'NORMAL' ? 'success' : row.label === 'ABNORMAL' ? 'danger' : 'info'"
+            >{{ labelText(row.label) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="110">
+          <template #default="{ row }"><StatusBadge :status="row.status" /></template>
+        </el-table-column>
+        <el-table-column label="帧数" prop="totalFrames" width="80" />
+        <el-table-column label="告警帧" prop="matchedAlarms" width="80" />
+        <el-table-column label="错误" prop="errorMsg" min-width="120" show-overflow-tooltip />
+      </el-table>
+    </el-card>
+
+    <!-- 追加视频对话框 -->
+    <el-dialog v-model="showAddVideo" title="追加视频" width="480px">
+      <el-form label-width="100px">
+        <el-form-item label="视频标注">
+          <el-select v-model="addVideoForm.label" style="width: 100%">
+            <el-option label="混合（默认）" value="MIXED" />
+            <el-option label="正常录像" value="NORMAL" />
+            <el-option label="异常/缺陷" value="ABNORMAL" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="视频文件">
+          <el-upload
+            :before-upload="handleAddVideoUpload"
+            :show-file-list="false"
+            accept="video/*"
+            drag
+          >
+            <div v-if="!addVideoForm.url" class="upload-placeholder">
+              <el-icon class="upload-icon"><Upload /></el-icon>
+              <div>点击或拖拽上传视频</div>
+            </div>
+            <div v-else class="upload-done">
+              <el-icon><VideoPlay /></el-icon>
+              <span>{{ addVideoForm.name }} 上传成功</span>
+            </div>
+          </el-upload>
+          <el-progress v-if="addVideoProgress > 0 && addVideoProgress < 100" :percentage="addVideoProgress" style="margin-top: 6px" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddVideo = false">取消</el-button>
+        <el-button type="primary" :loading="addingVideo" :disabled="!addVideoForm.url" @click="submitAddVideo">确认追加</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 导出训练数据集区域（仿真完成后显示） -->
     <el-card
@@ -152,6 +217,7 @@
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Plus, Upload, VideoPlay } from '@element-plus/icons-vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { simulationApi } from '@/api/simulation'
@@ -184,6 +250,12 @@ const task = ref<SimulationTask | null>(null)
 const loading = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
+// 追加视频相关状态
+const showAddVideo = ref(false)
+const addingVideo = ref(false)
+const addVideoProgress = ref(0)
+const addVideoForm = reactive({ url: '', name: '', label: 'MIXED' })
+
 // 导出相关状态
 const exportStatus = ref<ExportStatus | null>(null)
 const exportLoading = ref(false)
@@ -213,6 +285,42 @@ async function cancelTask() {
   await simulationApi.cancel(taskId)
   ElMessage.success('任务已取消')
   loadTask()
+}
+
+function labelText(label: string) {
+  if (label === 'NORMAL') return '正常录像'
+  if (label === 'ABNORMAL') return '异常/缺陷'
+  return '混合'
+}
+
+async function handleAddVideoUpload(file: File) {
+  if (!task.value?.sceneId) return false
+  addVideoProgress.value = 0
+  try {
+    const res = await simulationApi.uploadVideo(file, task.value.sceneId, (p) => { addVideoProgress.value = p })
+    addVideoForm.url = res.data.data.url
+    addVideoForm.name = file.name
+    ElMessage.success('视频上传成功')
+  } catch {
+    ElMessage.error('上传失败，请重试')
+  }
+  return false
+}
+
+async function submitAddVideo() {
+  if (!addVideoForm.url) return
+  addingVideo.value = true
+  try {
+    await simulationApi.addVideo(taskId, addVideoForm.url, addVideoForm.label)
+    ElMessage.success('视频已追加')
+    showAddVideo.value = false
+    addVideoForm.url = ''
+    addVideoForm.name = ''
+    addVideoForm.label = 'MIXED'
+    loadTask()
+  } finally {
+    addingVideo.value = false
+  }
 }
 
 async function loadDatasetVersions() {
@@ -301,4 +409,13 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .card-title { font-weight: 600; }
+.upload-placeholder, .upload-done {
+  padding: 16px;
+  text-align: center;
+  color: #909399;
+}
+.upload-icon {
+  font-size: 30px;
+  margin-bottom: 6px;
+}
 </style>

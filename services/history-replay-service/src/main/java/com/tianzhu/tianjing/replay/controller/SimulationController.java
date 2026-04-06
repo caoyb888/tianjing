@@ -4,12 +4,15 @@ import com.tianzhu.tianjing.common.response.ApiResponse;
 import com.tianzhu.tianjing.common.response.PageResult;
 import com.tianzhu.tianjing.common.security.TianjingUserDetails;
 import com.tianzhu.tianjing.replay.domain.SimulationTask;
+import com.tianzhu.tianjing.replay.domain.SimulationVideo;
 import com.tianzhu.tianjing.replay.dto.DatasetExportRequest;
 import com.tianzhu.tianjing.replay.dto.DatasetExportStatusDTO;
 import com.tianzhu.tianjing.replay.dto.SimulationCreateRequest;
 import com.tianzhu.tianjing.replay.service.DatasetExportService;
 import com.tianzhu.tianjing.replay.service.SimulationService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -17,6 +20,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -73,6 +77,28 @@ public class SimulationController {
         return ApiResponse.ok(simulationService.createTask(request, user.getUsername()));
     }
 
+    /**
+     * GET /simulations/{task_id}/videos — 查询任务的视频列表
+     */
+    @GetMapping("/{task_id}/videos")
+    public ApiResponse<List<SimulationVideo>> listVideos(
+            @PathVariable("task_id") String taskId) {
+        return ApiResponse.ok(simulationService.listVideos(taskId));
+    }
+
+    /**
+     * POST /simulations/{task_id}/videos — 向已有任务追加一个视频
+     * 用于"分次上传"场景：任务创建后继续补传视频
+     */
+    @PostMapping("/{task_id}/videos")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<SimulationVideo> addVideo(
+            @PathVariable("task_id") String taskId,
+            @Valid @RequestBody AddVideoRequest request,
+            @AuthenticationPrincipal TianjingUserDetails user) {
+        return ApiResponse.ok(simulationService.addVideo(taskId, request.videoUrl(), request.label(), user.getUsername()));
+    }
+
     /** POST /simulations/{task_id}/cancel — 取消仿真任务 */
     @PostMapping("/{task_id}/cancel")
     public ApiResponse<Void> cancelTask(
@@ -107,4 +133,11 @@ public class SimulationController {
         SimulationTask task = simulationService.getTask(taskId);
         return ApiResponse.ok(datasetExportService.getExportStatus(task));
     }
+
+    /** POST /simulations/{task_id}/videos 请求体 */
+    record AddVideoRequest(
+            @NotBlank @JsonProperty("video_url") String videoUrl,
+            /** NORMAL / ABNORMAL / MIXED，默认 MIXED */
+            @JsonProperty("label") String label
+    ) {}
 }

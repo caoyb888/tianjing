@@ -11,13 +11,30 @@ export const simulationApi = {
   get: (taskId: string) => request.get(`/simulations/${taskId}`),
 
   // 发送 snake_case 键名匹配后端 SimulationCreateRequest
-  create: (data: { sceneId: string; videoUrl: string; pluginId?: string; frameFps?: number }) =>
+  create: (data: {
+    sceneId: string
+    videoUrl: string
+    videoLabel?: string
+    pluginId?: string
+    frameFps?: number
+    extraVideos?: { videoUrl: string; label: string }[]
+  }) =>
     request.post('/simulations', {
-      scene_id:  data.sceneId,
-      video_url: data.videoUrl,
-      plugin_id: data.pluginId ?? 'CLOUD-PROXY-V1',
-      frame_fps: data.frameFps ?? 1,
+      scene_id:     data.sceneId,
+      video_url:    data.videoUrl,
+      video_label:  data.videoLabel ?? 'MIXED',
+      plugin_id:    data.pluginId ?? 'CLOUD-PROXY-V1',
+      frame_fps:    data.frameFps ?? 1,
+      extra_videos: data.extraVideos?.map(v => ({ video_url: v.videoUrl, label: v.label })),
     }),
+
+  /** 向已有任务追加一个视频（分次上传） */
+  addVideo: (taskId: string, videoUrl: string, label: string) =>
+    request.post(`/simulations/${taskId}/videos`, { video_url: videoUrl, label }),
+
+  /** 查询任务的视频列表 */
+  listVideos: (taskId: string) =>
+    request.get(`/simulations/${taskId}/videos`),
 
   cancel: (taskId: string) => request.post(`/simulations/${taskId}/cancel`),
 

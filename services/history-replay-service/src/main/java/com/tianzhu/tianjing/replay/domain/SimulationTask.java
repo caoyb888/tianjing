@@ -3,6 +3,7 @@ package com.tianzhu.tianjing.replay.domain;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * 离线仿真任务（对应 simulation_task 表）
@@ -99,4 +100,8 @@ public class SimulationTask {
 
     @Version
     private Integer version;
+
+    /** 关联视频列表（非 DB 字段，由 Service 层填充后返回） */
+    @TableField(exist = false)
+    private List<SimulationVideo> videos;
 }
