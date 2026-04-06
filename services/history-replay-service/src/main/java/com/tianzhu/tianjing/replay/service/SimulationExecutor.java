@@ -92,48 +92,113 @@ public class SimulationExecutor {
         taskMapper.updateById(task);
         log.info("仿真开始 task_id={} plugin={} fps={}", taskId, pluginId, frameFps);
 
-        // 2. 下载视频到临时文件
-        String videoObjectPath = extractObjectPath(task.getVideoFileUrl());
-        Path tempVideo = Files.createTempFile("sim-" + taskId + "-", ".mp4");
-        try {
-            try (InputStream is = minioClient.getObject(GetObjectArgs.builder()
-                    .bucket(simBucket).object(videoObjectPath).build())) {
-                Files.copy(is, tempVideo, StandardCopyOption.REPLACE_EXISTING);
-            }
-            log.info("视频下载完成 task_id={} size={}B path={}", taskId, Files.size(tempVideo), tempVideo);
-
-            // 3. 抽帧 + 推理
-            List<FrameResult> frameResults = extractAndInfer(task, tempVideo, pluginId, frameFps);
-
-            // 4. 写 result_json，更新状态为 COMPLETED
-            int detectionFrames = (int) frameResults.stream()
-                    .filter(f -> f.detections() != null && !f.detections().isEmpty())
-                    .count();
-            ResultJson resultJson = new ResultJson(frameResults, pluginId, frameResults.size(), detectionFrames);
-
-            task.setStatus("COMPLETED");
-            task.setFinishedAt(OffsetDateTime.now());
-            task.setTotalFrames(frameResults.size());
-            task.setMatchedAlarms(detectionFrames);
-            task.setResultJson(objectMapper.writeValueAsString(resultJson));
-            task.setProgress(100);
-            taskMapper.updateById(task);
-
-            // 同步更新 simulation_video 第一条记录的统计字段
-            updateVideoStats(taskId, frameResults.size(), detectionFrames, "COMPLETED", null);
-
-            log.info("仿真完成 task_id={} 总帧数={} 检测帧={}", taskId, frameResults.size(), detectionFrames);
-
-        } finally {
-            Files.deleteIfExists(tempVideo);
+        // 2. 从 simulation_video 表获取本任务全部视频（按 sort_order 顺序）
+        //    若表中无记录（旧任务兼容），回退到 task.videoFileUrl
+        List<SimulationVideo> videos = videoMapper.selectByTaskId(taskId);
+        if (videos.isEmpty()) {
+            // 兼容旧数据：直接用 task.video_file_url 构造虚拟记录
+            SimulationVideo fallback = new SimulationVideo();
+            fallback.setVideoUrl(task.getVideoFileUrl());
+            fallback.setVideoName("video.mp4");
+            fallback.setSortOrder(0);
+            videos = List.of(fallback);
         }
+        log.info("本任务共 {} 个视频 task_id={}", videos.size(), taskId);
+
+        // 3. 逐个视频下载 → 抽帧 → 推理，汇总所有帧结果
+        List<FrameResult> allFrameResults = new ArrayList<>();
+
+        for (SimulationVideo video : videos) {
+            String videoUrl = video.getVideoUrl();
+            String videoName = video.getVideoName() != null ? video.getVideoName() : "video.mp4";
+            String videoObjectPath = extractObjectPath(videoUrl);
+            Path tempVideo = Files.createTempFile("sim-" + taskId + "-v" + video.getSortOrder() + "-", ".mp4");
+
+            log.info("开始处理视频 [{}/{}] {} task_id={}",
+                    video.getSortOrder() + 1, videos.size(), videoName, taskId);
+
+            // 将当前视频标记为 RUNNING
+            if (video.getId() != null) {
+                video.setStatus("RUNNING");
+                videoMapper.updateById(video);
+            }
+
+            try {
+                try (InputStream is = minioClient.getObject(GetObjectArgs.builder()
+                        .bucket(simBucket).object(videoObjectPath).build())) {
+                    Files.copy(is, tempVideo, StandardCopyOption.REPLACE_EXISTING);
+                }
+                log.info("视频下载完成 {} size={}B", videoName, Files.size(tempVideo));
+
+                // 抽帧 + 推理（帧ID加视频序号前缀，避免多视频帧ID冲突）
+                List<FrameResult> videoFrames = extractAndInfer(task, tempVideo, pluginId, frameFps,
+                        video.getSortOrder(), allFrameResults.size());
+
+                int videoDetections = (int) videoFrames.stream()
+                        .filter(f -> f.detections() != null && !f.detections().isEmpty())
+                        .count();
+
+                allFrameResults.addAll(videoFrames);
+
+                // 更新当前视频的统计字段
+                if (video.getId() != null) {
+                    video.setTotalFrames(videoFrames.size());
+                    video.setMatchedAlarms(videoDetections);
+                    video.setStatus("COMPLETED");
+                    videoMapper.updateById(video);
+                }
+                log.info("视频 {} 推理完成 帧数={} 检测帧={}", videoName, videoFrames.size(), videoDetections);
+
+            } catch (Exception e) {
+                log.error("视频 {} 推理失败 task_id={}", videoName, taskId, e);
+                if (video.getId() != null) {
+                    video.setStatus("FAILED");
+                    video.setErrorMsg(e.getMessage() != null
+                            ? e.getMessage().substring(0, Math.min(e.getMessage().length(), 500))
+                            : "推理失败");
+                    videoMapper.updateById(video);
+                }
+                // 单个视频失败不中断整个任务，继续处理下一个
+            } finally {
+                Files.deleteIfExists(tempVideo);
+            }
+
+            // 更新任务整体进度（按视频数量均分）
+            int overallProgress = Math.min(95,
+                    (video.getSortOrder() + 1) * 95 / videos.size());
+            task.setProgress(overallProgress);
+            task.setTotalFrames(allFrameResults.size());
+            taskMapper.updateById(task);
+        }
+
+        // 4. 汇总写入 result_json，更新任务为 COMPLETED
+        int totalDetectionFrames = (int) allFrameResults.stream()
+                .filter(f -> f.detections() != null && !f.detections().isEmpty())
+                .count();
+        ResultJson resultJson = new ResultJson(allFrameResults, pluginId,
+                allFrameResults.size(), totalDetectionFrames);
+
+        task.setStatus("COMPLETED");
+        task.setFinishedAt(OffsetDateTime.now());
+        task.setTotalFrames(allFrameResults.size());
+        task.setMatchedAlarms(totalDetectionFrames);
+        task.setResultJson(objectMapper.writeValueAsString(resultJson));
+        task.setProgress(100);
+        taskMapper.updateById(task);
+
+        log.info("仿真全部完成 task_id={} 视频数={} 总帧数={} 检测帧={}",
+                taskId, videos.size(), allFrameResults.size(), totalDetectionFrames);
     }
 
     /**
-     * 用 FFmpegFrameGrabber 按配置频率抽帧，逐帧调用推理代理，返回帧级推理结果
+     * 用 FFmpegFrameGrabber 按配置频率抽帧，逐帧调用推理代理，返回本视频的帧级推理结果
+     *
+     * @param videoIndex    当前视频在任务中的序号（0-based），用于生成不重复的帧ID前缀
+     * @param globalOffset  已处理的全局帧数偏移，用于生成连续的全局帧序号
      */
     private List<FrameResult> extractAndInfer(SimulationTask task, Path videoPath,
-                                               String pluginId, int frameFps) throws Exception {
+                                               String pluginId, int frameFps,
+                                               int videoIndex, int globalOffset) throws Exception {
         String taskId = task.getTaskId();
         String framesPrefix = "simulation/" + taskId + "/frames/";
         List<FrameResult> results = new ArrayList<>();
@@ -144,17 +209,13 @@ public class SimulationExecutor {
             double videoFpsActual = grabber.getFrameRate();
             int totalFrameCount  = grabber.getLengthInFrames();
 
-            // 每 frameStep 帧提取一帧，保证输出频率接近 frameFps
             int frameStep = (videoFpsActual > 0 && frameFps > 0)
                     ? Math.max(1, (int) Math.round(videoFpsActual / frameFps))
                     : 1;
             int estimatedOutput = Math.max(1, totalFrameCount > 0 ? totalFrameCount / frameStep : 60);
 
-            task.setTotalFrames(estimatedOutput);
-            taskMapper.updateById(task);
-
-            log.info("视频信息 task_id={} 原始fps={} 总帧={} 每{}帧取1帧 预计输出{}帧",
-                    taskId, videoFpsActual, totalFrameCount, frameStep, estimatedOutput);
+            log.info("视频[{}] 原始fps={} 总帧={} 每{}帧取1帧 预计输出{}帧",
+                    videoIndex, videoFpsActual, totalFrameCount, frameStep, estimatedOutput);
 
             Java2DFrameConverter converter = new Java2DFrameConverter();
             int frameNum = 0;
@@ -164,9 +225,9 @@ public class SimulationExecutor {
             while ((frame = grabber.grabImage()) != null) {
                 if (frameNum % frameStep == 0 && frame.image != null) {
                     long timestampMs = grabber.getTimestamp() / 1000;
-                    String frameId = String.format("frame_%06d", extracted + 1);
+                    // 全局唯一帧ID：v{视频序号}_frame_{全局序号}
+                    String frameId = String.format("v%d_frame_%06d", videoIndex, globalOffset + extracted + 1);
 
-                    // 转为 JPEG 字节数组
                     BufferedImage img = converter.convert(frame);
                     if (img == null) { frameNum++; continue; }
 
@@ -174,7 +235,6 @@ public class SimulationExecutor {
                     ImageIO.write(img, "jpg", baos);
                     byte[] jpegBytes = baos.toByteArray();
 
-                    // 上传帧到 MinIO tianjing-sim-temp/simulation/{taskId}/frames/
                     String frameObjPath = framesPrefix + frameId + ".jpg";
                     try (InputStream fis = new ByteArrayInputStream(jpegBytes)) {
                         minioClient.putObject(PutObjectArgs.builder()
@@ -186,12 +246,10 @@ public class SimulationExecutor {
                     }
                     String frameUrl = minioEndpoint + "/" + simBucket + "/" + frameObjPath;
 
-                    // 调用推理代理（is_sandbox=true 由 InferenceClient 保证）
                     String imageB64 = Base64.getEncoder().encodeToString(jpegBytes);
                     List<InferenceClient.Detection> detections =
                             inferenceClient.infer(imageB64, task.getSceneId(), frameId, timestampMs);
 
-                    // 转换为 result_json 格式
                     List<Detection> resultDetections = detections.stream()
                             .map(d -> new Detection(
                                     d.classId(), d.className(), d.confidence(),
@@ -200,14 +258,6 @@ public class SimulationExecutor {
 
                     results.add(new FrameResult(frameId, frameUrl, timestampMs, resultDetections));
                     extracted++;
-
-                    // 每 10 帧更新一次进度（95% 封顶，等 COMPLETED 再写 100）
-                    if (extracted % 10 == 0) {
-                        int progress = Math.min(95, (int) (extracted * 95.0 / estimatedOutput));
-                        task.setProgress(progress);
-                        task.setTotalFrames(extracted);
-                        taskMapper.updateById(task);
-                    }
                 }
                 frameNum++;
             }
@@ -226,31 +276,23 @@ public class SimulationExecutor {
             task.setFinishedAt(OffsetDateTime.now());
             task.setProgress(0);
             taskMapper.updateById(task);
-            // 同步更新视频记录为 FAILED
-            updateVideoStats(task.getTaskId(), 0, 0, "FAILED", truncatedMsg);
+            // 将所有未完成的视频记录标记为 FAILED
+            try {
+                videoMapper.selectByTaskId(task.getTaskId()).stream()
+                        .filter(v -> !"COMPLETED".equals(v.getStatus()))
+                        .forEach(v -> {
+                            v.setStatus("FAILED");
+                            v.setErrorMsg(truncatedMsg);
+                            videoMapper.updateById(v);
+                        });
+            } catch (Exception ex) {
+                log.warn("更新视频 FAILED 状态失败: {}", ex.getMessage());
+            }
         } catch (Exception e) {
             log.error("写入 FAILED 状态失败 task_id={}", task.getTaskId(), e);
         }
     }
 
-    /** 将仿真结果回写到 simulation_video 第一条记录（sortOrder=0 的主视频） */
-    private void updateVideoStats(String taskId, int totalFrames, int matchedAlarms,
-                                  String status, String errorMsg) {
-        try {
-            List<SimulationVideo> videos = videoMapper.selectByTaskId(taskId);
-            if (videos.isEmpty()) return;
-            SimulationVideo v = videos.get(0);
-            v.setTotalFrames(totalFrames);
-            v.setMatchedAlarms(matchedAlarms);
-            v.setStatus(status);
-            v.setErrorMsg(errorMsg);
-            videoMapper.updateById(v);
-            log.debug("已更新 simulation_video task_id={} status={} frames={} alarms={}",
-                    taskId, status, totalFrames, matchedAlarms);
-        } catch (Exception e) {
-            log.warn("更新 simulation_video 统计失败 task_id={}: {}", taskId, e.getMessage());
-        }
-    }
 
     private String extractObjectPath(String url) {
         int idx = url.indexOf(simBucket);
