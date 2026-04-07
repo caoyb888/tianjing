@@ -13,9 +13,9 @@
         :collapse="layoutStore.sidebarCollapsed"
         :collapse-transition="false"
         router
-        background-color="#001529"
-        text-color="#ffffffa6"
-        active-text-color="#ffffff"
+        background-color="#0D1B2E"
+        text-color="rgba(255,255,255,.72)"
+        active-text-color="#E8F0FE"
         class="sidebar-menu"
       >
         <template v-for="item in visibleMenus" :key="item.path || item.title">
@@ -79,7 +79,7 @@ const visibleMenus = computed(() =>
 .app-sidebar {
   width: 220px;
   min-height: 100vh;
-  background: #001529;
+  background: var(--tj-bg-sidebar);
   display: flex;
   flex-direction: column;
   transition: width 0.3s;
@@ -96,14 +96,14 @@ const visibleMenus = computed(() =>
   align-items: center;
   padding: 0 16px;
   overflow: hidden;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .logo-icon {
   width: 32px;
   height: 32px;
-  background: var(--el-color-primary);
-  border-radius: 6px;
+  background: var(--tj-primary);
+  border-radius: var(--tj-radius-md);
   color: #fff;
   font-size: 12px;
   font-weight: bold;
@@ -114,11 +114,12 @@ const visibleMenus = computed(() =>
 }
 
 .logo-text {
-  color: #fff;
-  font-size: 16px;
+  color: #E8F0FE;
+  font-size: 15px;
   font-weight: bold;
   margin-left: 10px;
   white-space: nowrap;
+  letter-spacing: 0.5px;
 }
 
 .sidebar-scroll {
@@ -127,6 +128,13 @@ const visibleMenus = computed(() =>
 
 .sidebar-menu {
   border: none;
+}
+
+// 侧边栏菜单激活项指示条（左侧 3px 亮线）
+:deep(.el-menu-item.is-active) {
+  background: rgba(21, 87, 176, 0.35) !important;
+  border-left: 3px solid var(--tj-primary-light) !important;
+  color: #fff !important;
 }
 
 .collapse-btn {

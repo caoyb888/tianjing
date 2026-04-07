@@ -27,3 +27,11 @@ const breadcrumbs = computed(() => {
   return crumbs
 })
 </script>
+
+<style scoped lang="scss">
+// 面包屑当前页（最后一级）使用主色
+:deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner) {
+  color: var(--tj-primary);
+  font-weight: 500;
+}
+</style>
