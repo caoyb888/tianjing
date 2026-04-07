@@ -7,7 +7,7 @@ import { computed } from 'vue'
 
 interface Props {
   status: string
-  map?: Record<string, { label: string; type: '' | 'success' | 'warning' | 'danger' | 'info' }>
+  map?: Record<string, { label: string; type: 'success' | 'warning' | 'danger' | 'info' }>
   size?: 'large' | 'default' | 'small'
   effect?: 'dark' | 'light' | 'plain'
 }
@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 // 统一使用 effect="dark" + 调整颜色语义
-const defaultMap: Record<string, { label: string; type: '' | 'success' | 'warning' | 'danger' | 'info' }> = {
+const defaultMap: Record<string, { label: string; type: 'success' | 'warning' | 'danger' | 'info' }> = {
   // 运行态
   active: { label: '运行中', type: 'success' },
   running: { label: '运行中', type: 'success' },
@@ -42,7 +42,7 @@ const defaultMap: Record<string, { label: string; type: '' | 'success' | 'warnin
 }
 
 const currentMap = computed(() => props.map || defaultMap)
-const currentConfig = computed(() => currentMap.value[props.status] || { label: props.status, type: '' as const })
+const currentConfig = computed(() => currentMap.value[props.status] || { label: props.status, type: 'info' as const })
 const label = computed(() => currentConfig.value.label)
 const tagType = computed(() => currentConfig.value.type)
 </script>
