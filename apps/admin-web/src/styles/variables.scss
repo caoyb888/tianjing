@@ -88,4 +88,21 @@
   --tj-critical-bg:  rgba(217, 54, 62, .15);
   --tj-warning-bg:   rgba(230, 162, 60, .15);
   // 主色、告警色在深色模式下保持不变
+
+  // Element Plus 深色模式覆盖
+  --el-bg-color: #1F1F1F;
+  --el-bg-color-page: #141414;
+  --el-bg-color-overlay: #1F1F1F;
+  --el-text-color-primary: #E8E8F0;
+  --el-text-color-regular: #B0B0C0;
+  --el-text-color-secondary: #707080;
+  --el-text-color-placeholder: #505060;
+  --el-border-color: #303040;
+  --el-border-color-light: #2A2A3A;
+  --el-border-color-lighter: #252535;
+  --el-fill-color: #262626;
+  --el-fill-color-light: #1F1F1F;
+  --el-fill-color-lighter: #1A1A1A;
+  --el-fill-color-extra-light: #141414;
+  --el-mask-color: rgba(0, 0, 0, 0.8);
 }

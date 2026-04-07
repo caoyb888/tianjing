@@ -43,6 +43,19 @@ body,
   }
 }
 
+// 深色模式滚动条
+.dark ::-webkit-scrollbar-track {
+  background: #2A2A3A;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4A4A5A;
+
+  &:hover {
+    background: #5A5A6A;
+  }
+}
+
 // 页面过渡动画
 .fade-enter-active,
 .fade-leave-active {
