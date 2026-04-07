@@ -59,9 +59,14 @@ public class ModelVersionService {
         mv.setMlflowRunId(request.mlflowRunId());
         mv.setModelPath(request.modelArtifactUrl());
         mv.setTrainJobId(request.trainingJobId());
+        // 训练流水线目前固定导出 ONNX 格式；如后续支持 TensorRT 可从请求体扩展此字段
+        mv.setExportFormat("ONNX");
         mv.setStatus("STAGING");
         mv.setCreatedBy(operator);
         mv.setUpdatedBy(operator);
+        OffsetDateTime now = OffsetDateTime.now();
+        mv.setCreatedAt(now);
+        mv.setUpdatedAt(now);
         modelVersionMapper.insert(mv);
         log.info("注册模型版本 version_id={} plugin_id={} operator={}", mv.getVersionId(), mv.getPluginId(), operator);
         return mv;
