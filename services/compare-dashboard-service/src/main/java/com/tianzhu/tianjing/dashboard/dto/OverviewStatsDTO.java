@@ -1,11 +1,16 @@
 package com.tianzhu.tianjing.dashboard.dto;
 
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+
 import java.time.OffsetDateTime;
 
 /**
  * 平台概览统计数据 DTO
  * 规范：实时告警大屏开发优化计划.md §3.2
+ * 序列化为 snake_case（前端接口约定）
  */
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record OverviewStatsDTO(
         // 统计卡片
         Integer activeScenes,
