@@ -67,16 +67,39 @@ function handleCurrentChange() {
 
 <style scoped lang="scss">
 .data-table {
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  background: var(--tj-bg-card);
+  border-radius: var(--tj-radius-sm);
+  box-shadow: var(--tj-shadow-card);
   overflow: hidden;
 }
 
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
-  padding: 16px;
-  border-top: 1px solid #f0f0f0;
+  padding: var(--tj-space-md);
+  border-top: 1px solid var(--tj-border-light);
+}
+
+// 表格行高收紧（工业 UI 信息密度优化）
+:deep(.el-table__row td) {
+  padding: 10px 0;
+}
+
+// 表头加强
+:deep(.el-table__header th) {
+  background: var(--tj-primary-light) !important;
+  color: var(--tj-text-primary);
+  font-weight: 600;
+  font-size: var(--tj-font-sm);
+}
+
+// 斑马纹
+:deep(.el-table--striped .el-table__body tr.el-table__row--striped td) {
+  background: #FAFBFF;
+}
+
+// 行悬浮
+:deep(.el-table__body tr:hover > td) {
+  background: var(--tj-primary-light) !important;
 }
 </style>

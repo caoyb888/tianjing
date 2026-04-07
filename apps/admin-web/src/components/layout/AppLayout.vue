@@ -49,7 +49,7 @@ onUnmounted(() => {
 .page-content {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  background: #f0f2f5;
+  padding: var(--tj-space-md);
+  background: var(--tj-bg-page);
 }
 </style>

@@ -400,11 +400,11 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .video-item {
-  border: 1px solid #e4e7ed;
-  border-radius: 6px;
+  border: 1px solid var(--tj-border-base);
+  border-radius: var(--tj-radius-md);
   padding: 12px;
   margin-bottom: 10px;
-  background: #fafafa;
+  background: var(--tj-bg-page);
 }
 .video-item-header {
   display: flex;

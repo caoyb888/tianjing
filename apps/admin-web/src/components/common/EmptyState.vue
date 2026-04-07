@@ -18,8 +18,14 @@ withDefaults(defineProps<{
 
 <style scoped lang="scss">
 .empty-state {
-  padding: 40px 0;
+  padding: var(--tj-space-xl) 0;
   display: flex;
   justify-content: center;
+}
+
+// 空状态图标与文字色调整
+:deep(.el-empty__description) {
+  color: var(--tj-text-secondary);
+  font-size: var(--tj-font-sm);
 }
 </style>

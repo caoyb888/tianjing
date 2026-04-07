@@ -42,9 +42,9 @@ const page = ref(1)
 const size = ref(20)
 
 function scoreColor(score: number) {
-  if (score >= 80) return '#52c41a'
-  if (score >= 60) return '#e6a23c'
-  return '#f56c6c'
+  if (score >= 80) return 'var(--tj-success)'
+  if (score >= 60) return 'var(--tj-warning)'
+  return 'var(--tj-critical)'
 }
 
 async function loadHistory() {

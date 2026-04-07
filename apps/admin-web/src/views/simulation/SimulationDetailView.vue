@@ -408,14 +408,30 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-.card-title { font-weight: 600; }
+.card-title { font-weight: 600; color: var(--tj-text-primary); }
+
+// 视频上传区拖拽边框色
 .upload-placeholder, .upload-done {
   padding: 16px;
   text-align: center;
-  color: #909399;
+  color: var(--tj-text-secondary);
+  border: 2px dashed var(--tj-border-base);
+  border-radius: var(--tj-radius-md);
+  background: var(--tj-bg-page);
+
+  &:hover {
+    border-color: var(--tj-primary);
+    color: var(--tj-primary);
+  }
 }
 .upload-icon {
   font-size: 30px;
   margin-bottom: 6px;
+  color: var(--tj-text-secondary);
+}
+
+// 视频列表状态色、进度条
+:deep(.el-progress-bar__inner) {
+  background-color: var(--tj-primary);
 }
 </style>

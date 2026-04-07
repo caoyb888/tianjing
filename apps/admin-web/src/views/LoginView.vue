@@ -110,7 +110,8 @@ async function handleLogin() {
 <style scoped lang="scss">
 .login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #001529 0%, #003a70 50%, #001529 100%);
+  // 工业蓝渐变背景
+  background: linear-gradient(135deg, #0D1B2E 0%, #1557B0 60%, #00B4C6 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -119,13 +120,15 @@ async function handleLogin() {
 }
 
 .login-container {
-  width: 400px;
+  width: 420px;
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
+  border-radius: var(--tj-radius-lg);
   padding: 48px 40px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   position: relative;
   z-index: 1;
+  // 毛玻璃效果（现代浏览器均支持）
+  backdrop-filter: blur(10px);
 }
 
 .login-header {
@@ -136,8 +139,8 @@ async function handleLogin() {
 .brand-logo {
   width: 60px;
   height: 60px;
-  background: linear-gradient(135deg, #1890ff, #096dd9);
-  border-radius: 12px;
+  background: linear-gradient(135deg, var(--tj-primary), var(--tj-accent));
+  border-radius: var(--tj-radius-lg);
   color: #fff;
   font-size: 20px;
   font-weight: bold;
@@ -148,15 +151,17 @@ async function handleLogin() {
 }
 
 .brand-title {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
-  color: #303133;
+  color: var(--tj-text-primary);
   margin-bottom: 6px;
+  letter-spacing: 0.5px;
 }
 
 .brand-subtitle {
   font-size: 13px;
-  color: #909399;
+  color: var(--tj-text-secondary);
+  margin-top: 4px;
 }
 
 .login-form {
@@ -168,23 +173,30 @@ async function handleLogin() {
 .login-btn {
   width: 100%;
   height: 44px;
-  font-size: 16px;
-  letter-spacing: 4px;
+  background: var(--tj-primary);
+  border-color: var(--tj-primary);
+  font-size: 15px;
+  letter-spacing: 2px;
   margin-top: 8px;
+
+  &:hover {
+    background: var(--tj-primary-dark);
+    border-color: var(--tj-primary-dark);
+  }
 }
 
 .login-footer {
   text-align: center;
-  font-size: 12px;
-  color: #c0c4cc;
+  font-size: var(--tj-font-xs);
+  color: var(--tj-text-placeholder);
   margin-top: 24px;
 }
 
-// 背景装饰圆
+// 背景装饰圆（使用科技青色调）
 .bg-circle {
   position: absolute;
   border-radius: 50%;
-  background: rgba(24, 144, 255, 0.08);
+  background: rgba(0, 180, 198, 0.12);
 }
 
 .circle-1 {
@@ -199,7 +211,7 @@ async function handleLogin() {
   height: 300px;
   bottom: -80px;
   left: -80px;
-  background: rgba(24, 144, 255, 0.06);
+  background: rgba(21, 87, 176, 0.15);
 }
 
 .circle-3 {
@@ -207,6 +219,6 @@ async function handleLogin() {
   height: 200px;
   top: 40%;
   left: 10%;
-  background: rgba(24, 144, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
 }
 </style>

@@ -38,6 +38,7 @@
       v-model:page="query.page"
       v-model:size="query.size"
       @change="loadAlarms"
+      :row-class-name="alarmRowClass"
     >
       <el-table-column label="级别" width="90">
         <template #default="{ row }">
@@ -114,6 +115,12 @@ function levelType(level: AlarmLevel) {
   return (map[level] || 'info') as 'danger' | 'warning' | 'info'
 }
 
+function alarmRowClass({ row }: { row: AlarmRecord }) {
+  if (row.alarmLevel === AlarmLevel.CRITICAL) return 'row-critical'
+  if (row.alarmLevel === AlarmLevel.WARNING) return 'row-warning'
+  return ''
+}
+
 async function loadAlarms() {
   loading.value = true
   try {
@@ -144,3 +151,16 @@ function resetSearch() {
 
 onMounted(loadAlarms)
 </script>
+
+<style scoped lang="scss">
+// CRITICAL 告警行背景（对应 el-table 的 row-class-name）
+:deep(.row-critical td) {
+  background-color: var(--tj-critical-bg) !important;
+}
+:deep(.row-critical:hover td) {
+  background-color: #FFE0DE !important;
+}
+:deep(.row-warning td) {
+  background-color: var(--tj-warning-bg) !important;
+}
+</style>

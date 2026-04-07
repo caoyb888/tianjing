@@ -154,3 +154,15 @@ async function toggleScene(scene: SceneConfig) {
 
 onMounted(loadScenes)
 </script>
+
+<style scoped lang="scss">
+// 场景状态卡片样式优化
+:deep(.el-table__row) {
+  &.status-active {
+    background: rgba(82, 196, 26, 0.04);
+  }
+  &.status-inactive {
+    background: rgba(140, 140, 140, 0.04);
+  }
+}
+</style>

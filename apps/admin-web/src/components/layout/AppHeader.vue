@@ -114,13 +114,13 @@ async function handleCommand(command: string) {
 .app-header {
   height: 64px;
   background: #fff;
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid var(--tj-border-base);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
   flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .header-right {
@@ -131,7 +131,7 @@ async function handleCommand(command: string) {
 
 .header-btn {
   font-size: 18px;
-  color: #595959;
+  color: var(--tj-text-regular);
 }
 
 .user-info {
@@ -142,14 +142,24 @@ async function handleCommand(command: string) {
   padding: 0 8px;
 
   &:hover {
-    background: #f5f5f5;
-    border-radius: 4px;
+    background: var(--tj-bg-page);
+    border-radius: var(--tj-radius-sm);
   }
 }
 
 .username {
-  font-size: 14px;
-  color: #303133;
+  font-size: var(--tj-font-base);
+  color: var(--tj-text-primary);
+}
+
+.user-avatar {
+  background: var(--tj-primary) !important;
+  font-weight: 600;
+}
+
+// 头部告警铃铛 badge 颜色使用 --tj-critical
+:deep(.el-badge__content) {
+  background-color: var(--tj-critical) !important;
 }
 
 .alarm-item {
@@ -157,22 +167,22 @@ async function handleCommand(command: string) {
   align-items: flex-start;
   gap: 12px;
   padding: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--tj-border-light);
   cursor: pointer;
 
   &:hover {
-    background: #fafafa;
+    background: var(--tj-bg-page);
   }
 }
 
 .alarm-type {
-  font-size: 14px;
-  color: #303133;
+  font-size: var(--tj-font-base);
+  color: var(--tj-text-primary);
   margin-bottom: 4px;
 }
 
 .alarm-meta {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--tj-font-xs);
+  color: var(--tj-text-secondary);
 }
 </style>

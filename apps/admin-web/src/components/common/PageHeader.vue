@@ -22,21 +22,23 @@ defineProps<{
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e8e8e8;
+  padding-bottom: var(--tj-space-md);
+  margin-bottom: var(--tj-space-md);
+  border-bottom: 2px solid var(--tj-border-light);
 }
 
 .page-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
+  font-size: var(--tj-font-lg);
+  font-weight: 700;
+  color: var(--tj-text-primary);
   margin-bottom: 4px;
+  letter-spacing: -0.3px;
 }
 
 .page-description {
-  font-size: 13px;
-  color: #909399;
+  font-size: var(--tj-font-sm);
+  color: var(--tj-text-secondary);
+  margin-top: 4px;
 }
 
 .header-actions {

@@ -100,3 +100,10 @@ function resetSearch() {
 
 onMounted(loadDevices)
 </script>
+
+<style scoped lang="scss">
+// 设备健康度进度条颜色使用 Token
+:deep(.el-progress-bar__inner) {
+  background-color: var(--tj-primary);
+}
+</style>
