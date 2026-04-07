@@ -1,0 +1,91 @@
+// ═══════════════════════════════════════════════════════════════
+// 天柱·天镜 — 工业科技蓝主题设计 Token
+// 文件路径：src/styles/variables.scss
+// 用途：全局 CSS 自定义属性，所有样式文件通过此处引用变量
+// ═══════════════════════════════════════════════════════════════
+
+// ── 主色系 ─────────────────────────────────────────────────────
+:root {
+  --tj-primary:         #1557B0;   // 主操作色（替换 Element Plus 默认蓝）
+  --tj-primary-light:   #E8F0FE;   // 主色浅背景（hover、选中背景）
+  --tj-primary-dark:    #0F3E82;   // 主色深（按下状态）
+  --tj-accent:          #00B4C6;   // 强调色（图表、徽章）
+
+  // 告警色（与 AGENTS.md 告警级别对应）
+  --tj-critical:        #D9363E;   // CRITICAL 告警
+  --tj-critical-bg:     #FFF1F0;   // CRITICAL 行背景
+  --tj-warning:         #E6A23C;   // WARNING 告警（与 .sandbox-bbox 一致，禁止修改此值）
+  --tj-warning-bg:      #FFFBE6;   // WARNING 行背景
+  --tj-success:         #52C41A;   // 正常/完成
+  --tj-info:            #8C8C8C;   // 信息/停用
+
+  // 中性色
+  --tj-text-primary:    #1A1A2E;   // 主文字
+  --tj-text-regular:    #4A4A6A;   // 正文
+  --tj-text-secondary:  #8C8CA0;   // 次要文字
+  --tj-text-placeholder:#BFBFCF;   // 占位符
+
+  // 背景色
+  --tj-bg-page:         #F4F5F7;   // 页面背景
+  --tj-bg-card:         #FFFFFF;   // 卡片背景
+  --tj-bg-sidebar:      #0D1B2E;   // 侧边栏背景
+
+  // 边框
+  --tj-border-base:     #E4E7ED;   // 常规边框
+  --tj-border-light:    #F0F0F5;   // 轻边框（卡片内分割线）
+
+  // 阴影
+  --tj-shadow-card:     0 1px 4px rgba(0, 0, 0, .08);
+  --tj-shadow-hover:    0 4px 12px rgba(21, 87, 176, .15);
+
+  // 间距（保持与现有组件兼容）
+  --tj-space-xs:  4px;
+  --tj-space-sm:  8px;
+  --tj-space-md:  16px;
+  --tj-space-lg:  24px;
+  --tj-space-xl:  32px;
+
+  // 圆角
+  --tj-radius-sm:  4px;
+  --tj-radius-md:  8px;
+  --tj-radius-lg:  12px;
+
+  // 字号
+  --tj-font-xs:   12px;
+  --tj-font-sm:   13px;
+  --tj-font-base: 14px;
+  --tj-font-md:   16px;
+  --tj-font-lg:   20px;
+  --tj-font-xl:   28px;
+}
+
+// Element Plus 主色覆盖（在 :root 中覆盖 el- 变量）
+:root {
+  --el-color-primary:         var(--tj-primary);
+  --el-color-primary-light-3: #4A82C8;
+  --el-color-primary-light-5: #89ABDB;
+  --el-color-primary-light-7: #C4D5EE;
+  --el-color-primary-light-8: #DCEAF8;
+  --el-color-primary-light-9: var(--tj-primary-light);
+  --el-color-primary-dark-2:  var(--tj-primary-dark);
+  --el-color-danger:          var(--tj-critical);
+  --el-color-warning:         var(--tj-warning);
+  --el-color-success:         var(--tj-success);
+  --el-bg-color-page:         var(--tj-bg-page);
+}
+
+// ── 深色模式 ────────────────────────────────────────────────────
+.dark {
+  --tj-bg-page:      #141414;
+  --tj-bg-card:      #1F1F1F;
+  --tj-bg-sidebar:   #0A0F1A;
+  --tj-text-primary: #E8E8F0;
+  --tj-text-regular: #B0B0C0;
+  --tj-text-secondary: #707080;
+  --tj-border-base:  #303040;
+  --tj-border-light: #2A2A3A;
+  --tj-primary-light: rgba(21, 87, 176, .2);
+  --tj-critical-bg:  rgba(217, 54, 62, .15);
+  --tj-warning-bg:   rgba(230, 162, 60, .15);
+  // 主色、告警色在深色模式下保持不变
+}
