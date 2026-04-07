@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.List;
 /**
  * 告警管理业务服务
  * 规范：API 接口规范 V3.1 §6.7
+ * 扩展：实时告警大屏开发优化计划.md Phase 1（支持 levels 多选过滤）
  *
  * SECURITY: 所有外部推送操作必须经过 SandboxInterceptor 校验
  */
@@ -48,6 +50,11 @@ public class AlarmService {
                 .ge(params.startTime() != null, AlarmRecord::getAlarmAt, params.startTime())
                 .le(params.endTime() != null, AlarmRecord::getAlarmAt, params.endTime())
                 .orderByDesc(AlarmRecord::getAlarmAt);
+
+        // 处理 levels 多选过滤（优先级高于单选 alarmLevel）
+        if (!CollectionUtils.isEmpty(params.levels())) {
+            wrapper.in(AlarmRecord::getAlarmLevel, params.levels());
+        }
 
         var result = alarmMapper.selectPage(pageParam, wrapper);
         return PageResult.of(result.getTotal(), params.page(), params.size(), result.getRecords());

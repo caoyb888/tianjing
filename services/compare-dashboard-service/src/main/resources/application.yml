@@ -29,6 +29,12 @@ tianjing:
     url: ${TIANJING_POSTGRES_PROD_URL:jdbc:postgresql://localhost:5432/tianjing_prod}
     username: ${TIANJING_POSTGRES_PROD_USER:tianjing_prod_user}
     password: ${TIANJING_POSTGRES_PROD_PASSWORD:prod_user_dev_2024}
+  # TDengine 配置（大屏统计查询）
+  tdengine:
+    url: ${TIANJING_TDENGINE_URL:jdbc:TAOS-RS://localhost:6041/tianjing_ts?timezone=UTC}
+    username: ${TIANJING_TDENGINE_USER:root}
+    password: ${TIANJING_TDENGINE_PASSWORD:taosdata}
+    driver-class-name: ${TIANJING_TDENGINE_DRIVER:com.taosdata.jdbc.rs.RestfulDriver}
 
 management:
   endpoints:
