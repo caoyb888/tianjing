@@ -3,7 +3,9 @@ package com.tianzhu.tianjing.dashboard.controller;
 import com.tianzhu.tianjing.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -19,11 +21,16 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/dashboard")
-@RequiredArgsConstructor
 public class DashboardController {
+
+    private final JdbcTemplate prodJdbcTemplate;
 
     /** SSE 客户端列表（线程安全） */
     private final List<SseEmitter> sseClients = new CopyOnWriteArrayList<>();
+
+    public DashboardController(@Qualifier("prodJdbcTemplate") JdbcTemplate prodJdbcTemplate) {
+        this.prodJdbcTemplate = prodJdbcTemplate;
+    }
 
     /**
      * GET /dashboard/overview — 平台概览统计
@@ -31,29 +38,44 @@ public class DashboardController {
      */
     @GetMapping("/overview")
     public ApiResponse<Map<String, Object>> overview() {
+        // 从生产库实时查询
+        int activeScenes = queryCount(
+                "SELECT COUNT(*) FROM scene_config WHERE status = 'ACTIVE' AND is_deleted = false");
+        int onlineDevices = queryCount(
+                "SELECT COUNT(*) FROM camera_device WHERE health_status = 'HEALTHY'");
+        int todayAlarms = queryCount(
+                "SELECT COUNT(*) FROM alarm_record WHERE created_at >= CURRENT_DATE AND is_sandbox = false");
+
         Map<String, Object> data = new LinkedHashMap<>();
         // 统计卡片字段（前端 stats computed 使用）
-        data.put("active_scenes", 1);
-        data.put("online_devices", 0);
-        data.put("today_alarms", 0);
+        data.put("active_scenes", activeScenes);
+        data.put("online_devices", onlineDevices);
+        data.put("today_alarms", todayAlarms);
         data.put("today_inferences", 0);
         // 告警饼图字段（AlarmHeatmapChart 使用）
-        data.put("critical_alarms", 0);
-        data.put("warning_alarms", 0);
-        data.put("info_alarms", 0);
+        data.put("critical_alarms", queryCount(
+                "SELECT COUNT(*) FROM alarm_record WHERE created_at >= CURRENT_DATE AND alarm_level = 'CRITICAL' AND is_sandbox = false"));
+        data.put("warning_alarms", queryCount(
+                "SELECT COUNT(*) FROM alarm_record WHERE created_at >= CURRENT_DATE AND alarm_level = 'WARNING' AND is_sandbox = false"));
+        data.put("info_alarms", queryCount(
+                "SELECT COUNT(*) FROM alarm_record WHERE created_at >= CURRENT_DATE AND alarm_level = 'INFO' AND is_sandbox = false"));
         // 附加字段
-        data.put("total_scenes", 16);
+        data.put("total_scenes", queryCount("SELECT COUNT(*) FROM scene_config WHERE is_deleted = false"));
         data.put("avg_infer_latency_ms", 0.0);
         data.put("sandbox_sessions_running", 0);
-        data.put("factories", List.of(
-                Map.of("factory_code", "SINTER", "active_scenes", 1, "alarms_today", 0),
-                Map.of("factory_code", "STEEL",  "active_scenes", 0, "alarms_today", 0),
-                Map.of("factory_code", "PELLET", "active_scenes", 0, "alarms_today", 0),
-                Map.of("factory_code", "SECTION","active_scenes", 0, "alarms_today", 0),
-                Map.of("factory_code", "STRIP",  "active_scenes", 0, "alarms_today", 0)
-        ));
         data.put("generated_at", OffsetDateTime.now());
         return ApiResponse.ok(data);
+    }
+
+    /** 安全查询 COUNT，异常时返回 0 */
+    private int queryCount(String sql) {
+        try {
+            Integer result = prodJdbcTemplate.queryForObject(sql, Integer.class);
+            return result != null ? result : 0;
+        } catch (Exception e) {
+            log.warn("Dashboard 统计查询失败 sql={} error={}", sql, e.getMessage());
+            return 0;
+        }
     }
 
     /**

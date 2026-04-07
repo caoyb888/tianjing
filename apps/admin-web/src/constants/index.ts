@@ -107,7 +107,7 @@ export const SIDEBAR_MENUS = [
   },
   {
     title: 'Sandbox 实验室',
-    icon: 'Experiment',
+    icon: 'MagicStick',
     roles: [UserRole.ADMIN, UserRole.SANDBOX_OPERATOR, UserRole.MODEL_REVIEWER],
     children: [
       { path: '/sandbox/sessions', title: '实验会话', icon: 'SetUp' },
