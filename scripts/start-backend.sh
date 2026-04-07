@@ -235,16 +235,23 @@ start_cloud_inference_proxy() {
   local log="$LOG_DIR/cloud-inference-proxy.log"
   (
     cd "$CLOUD_INFER_DIR"
+    # ONNX_MODEL_PATH：优先使用已下载的 PRODUCTION 模型；回退到默认占位模型
+    local model_path="/tmp/tianjing-models/HEAD-SINTER-GRATE-V1/best.onnx"
+    [ -f "$model_path" ] || model_path="/models/yolov8n.onnx"
+    ONNX_MODEL_PATH="$model_path" \
+    env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY \
     nohup "$UV_BIN" run \
+      --python 3.10 \
       --with "fastapi==0.110.0" \
       --with "uvicorn[standard]==0.29.0" \
       --with "pydantic==2.6.4" \
       --with "numpy==1.26.4" \
       --with "opencv-python-headless==4.9.0.80" \
+      --with "onnxruntime==1.19.2" \
       --with "structlog==24.1.0" \
       --with "httpx==0.27.0" \
       python3 src/main.py > "$log" 2>&1 &
-    echo -e "  ${GREEN}已启动${RESET} cloud-inference-proxy  (PID=$!, port=8092, log=$log)"
+    echo -e "  ${GREEN}已启动${RESET} cloud-inference-proxy  (PID=$!, port=8092, log=$log, model=$model_path)"
   )
 }
 

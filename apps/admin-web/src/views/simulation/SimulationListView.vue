@@ -274,7 +274,7 @@ async function checkModelStatus() {
   try {
     const res = await simulationApi.modelStatus()
     const health = res.data.data
-    modelStatus.value = health?.onnxModelLoaded ? 'loaded' : 'unloaded'
+    modelStatus.value = health?.onnx_model_loaded ? 'loaded' : 'unloaded'
   } catch {
     modelStatus.value = 'error'
   }
@@ -286,8 +286,8 @@ async function warmupModel() {
   try {
     const res = await simulationApi.warmupModel()
     const health = res.data.data
-    modelStatus.value = health?.onnxModelLoaded ? 'loaded' : 'error'
-    if (health?.onnxModelLoaded) {
+    modelStatus.value = health?.onnx_model_loaded ? 'loaded' : 'error'
+    if (health?.onnx_model_loaded) {
       ElMessage.success('推理模型加载成功，可以创建仿真任务了')
     } else {
       ElMessage.error('模型加载失败，请检查推理服务日志')
