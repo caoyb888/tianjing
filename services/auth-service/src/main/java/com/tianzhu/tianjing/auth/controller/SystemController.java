@@ -146,7 +146,7 @@ public class SystemController {
                 .eq(SysUser::getIsDeleted, false));
         if (user == null) throw BusinessException.notFound(ErrorCode.USER_NOT_FOUND);
         if ("admin".equals(user.getUsername())) {
-            throw BusinessException.of(ErrorCode.PARAM_INVALID, "不允许删除内置 admin 用户");
+            throw BusinessException.of(ErrorCode.PARAM_MISSING, "不允许删除内置 admin 用户");
         }
         user.setIsDeleted(true);
         user.setUpdatedBy(operator.getUsername());
