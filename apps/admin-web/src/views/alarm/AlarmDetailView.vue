@@ -221,15 +221,24 @@ onMounted(loadAlarm)
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #c0c4cc;
+  color: var(--tj-text-placeholder);
 }
 .card-title { font-weight: 600; }
+
+// 告警详情页头部级别色块
+:deep(.el-descriptions__label) {
+  background: var(--tj-primary-light) !important;
+  color: var(--tj-text-primary);
+  font-weight: 600;
+}
+
 .tl-title {
   font-weight: 600;
   margin-right: 8px;
+  color: var(--tj-text-primary);
 }
 .tl-desc {
-  color: #606266;
-  font-size: 13px;
+  color: var(--tj-text-regular);
+  font-size: var(--tj-font-sm);
 }
 </style>

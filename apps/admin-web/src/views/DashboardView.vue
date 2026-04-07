@@ -177,6 +177,14 @@ onMounted(loadData)
 }
 
 .stat-card {
+  border: none;
+  box-shadow: var(--tj-shadow-card);
+  transition: box-shadow 0.2s;
+
+  &:hover {
+    box-shadow: var(--tj-shadow-hover);
+  }
+
   :deep(.el-card__body) {
     padding: 20px;
   }
@@ -189,28 +197,29 @@ onMounted(loadData)
 }
 
 .stat-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--tj-radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  color: var(--el-color-primary);
+  font-size: 28px;
+  color: var(--tj-primary);
   flex-shrink: 0;
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: #303133;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--tj-text-primary);
   line-height: 1;
   margin-bottom: 6px;
 }
 
 .stat-label {
-  font-size: 13px;
-  color: #909399;
+  font-size: var(--tj-font-sm);
+  color: var(--tj-text-secondary);
+  font-weight: 500;
 }
 
 .chart-row {
@@ -219,6 +228,13 @@ onMounted(loadData)
 
 .chart-card {
   height: 360px;
+  border: 1px solid var(--tj-border-light);
+  box-shadow: var(--tj-shadow-card);
+
+  :deep(.el-card__header) {
+    border-bottom-color: var(--tj-border-light);
+    padding: 14px 20px;
+  }
 
   :deep(.el-card__body) {
     height: calc(100% - 56px);
@@ -235,7 +251,7 @@ onMounted(loadData)
 .card-title {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: var(--tj-text-primary);
 }
 
 .realtime-card {

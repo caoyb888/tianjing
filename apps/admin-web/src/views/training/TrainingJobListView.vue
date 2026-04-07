@@ -189,5 +189,10 @@ onMounted(loadJobs)
 </script>
 
 <style scoped lang="scss">
-.form-hint { font-size: 12px; color: #909399; margin-top: 4px; line-height: 1.4; }
+.form-hint { font-size: 12px; color: var(--tj-text-secondary); margin-top: 4px; line-height: 1.4; }
+
+// 任务状态色阶
+:deep(.el-progress-bar__inner) {
+  background-color: var(--tj-primary);
+}
 </style>

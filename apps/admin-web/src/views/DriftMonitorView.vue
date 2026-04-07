@@ -109,10 +109,17 @@ onMounted(loadMetrics)
 
 <style scoped lang="scss">
 .chart-card {
+  border: 1px solid var(--tj-border-light);
+  box-shadow: var(--tj-shadow-card);
+
+  :deep(.el-card__header) {
+    border-bottom-color: var(--tj-border-light);
+  }
+
   :deep(.el-card__body) { height: 320px; padding: 16px; }
 }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
-.card-title { font-size: 15px; font-weight: 600; }
-.text-success { color: #52c41a; font-weight: 600; }
-.text-danger { color: #f56c6c; font-weight: 600; }
+.card-title { font-size: 15px; font-weight: 600; color: var(--tj-text-primary); }
+.text-success { color: var(--tj-success); font-weight: 600; }
+.text-danger { color: var(--tj-critical); font-weight: 600; }
 </style>

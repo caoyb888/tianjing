@@ -162,6 +162,21 @@ onUnmounted(clearTicker)
 </script>
 
 <style scoped lang="scss">
+// Sandbox 警示横幅（橙色条，区别于生产环境）
+.sandbox-banner {
+  background: linear-gradient(90deg, #E6A23C, #F5A623);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+  border-radius: var(--tj-radius-sm);
+}
+
 .progress-panel {
   margin-bottom: 0;
 }
@@ -179,26 +194,26 @@ onUnmounted(clearTicker)
 .hours-value {
   font-size: 36px;
   font-weight: 700;
-  color: #1890ff;
+  color: var(--tj-primary);
   line-height: 1;
 }
 .hours-unit {
   font-size: 14px;
-  color: #606266;
+  color: var(--tj-text-regular);
 }
 .progress-hint {
   font-size: 12px;
-  color: #909399;
+  color: var(--tj-text-secondary);
 }
 .progress-footer {
   display: flex;
   gap: 24px;
   margin-top: 8px;
   font-size: 12px;
-  color: #909399;
+  color: var(--tj-text-secondary);
 }
 .running-tip {
-  color: #e6a23c;
+  color: var(--tj-warning);
 }
 .metric-grid {
   display: grid;
@@ -212,12 +227,14 @@ onUnmounted(clearTicker)
 .metric-value {
   font-size: 32px;
   font-weight: 700;
-  color: #1890ff;
+  color: var(--tj-primary);
 }
 .metric-label {
   font-size: 13px;
-  color: #909399;
+  color: var(--tj-text-secondary);
   margin-top: 4px;
 }
 .card-title { font-weight: 600; }
+
+// 注意：.sandbox-bbox 虚线框样式在 index.scss 中，此处不得触碰
 </style>
