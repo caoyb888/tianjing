@@ -1,11 +1,13 @@
 package com.tianzhu.tianjing.dashboard.controller;
 
 import com.tianzhu.tianjing.common.response.ApiResponse;
+import com.tianzhu.tianjing.dashboard.dto.FactorySummaryDTO;
+import com.tianzhu.tianjing.dashboard.dto.OverviewStatsDTO;
+import com.tianzhu.tianjing.dashboard.dto.TrendPointDTO;
+import com.tianzhu.tianjing.dashboard.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -16,66 +18,46 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * 数据看板接口
  * 规范：API 接口规范 V3.1 §6.13（3 个端点）
- * 包含：概览统计 / SSE 实时告警 / 推理趋势
+ * 扩展：实时告警大屏开发优化计划.md Phase 1（新增筛选参数和厂部汇总接口）
+ * 包含：概览统计 / SSE 实时告警 / 推理趋势 / 厂部汇总
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/dashboard")
+@RequiredArgsConstructor
 public class DashboardController {
 
-    private final JdbcTemplate prodJdbcTemplate;
+    private final DashboardService dashboardService;
 
     /** SSE 客户端列表（线程安全） */
     private final List<SseEmitter> sseClients = new CopyOnWriteArrayList<>();
 
-    public DashboardController(@Qualifier("prodJdbcTemplate") JdbcTemplate prodJdbcTemplate) {
-        this.prodJdbcTemplate = prodJdbcTemplate;
-    }
-
     /**
      * GET /dashboard/overview — 平台概览统计
      * 字段名与前端 DashboardView stats 计算属性对齐
+     *
+     * @param factory 厂部编码（可选）：PELLET/SINTER/STEEL/SECTION/STRIP
+     * @param sceneId 场景ID（可选）
      */
     @GetMapping("/overview")
-    public ApiResponse<Map<String, Object>> overview() {
-        // 从生产库实时查询
-        int activeScenes = queryCount(
-                "SELECT COUNT(*) FROM scene_config WHERE status = 'ACTIVE' AND is_deleted = false");
-        int onlineDevices = queryCount(
-                "SELECT COUNT(*) FROM camera_device WHERE health_status = 'HEALTHY'");
-        int todayAlarms = queryCount(
-                "SELECT COUNT(*) FROM alarm_record WHERE created_at >= CURRENT_DATE AND is_sandbox = false");
-
-        Map<String, Object> data = new LinkedHashMap<>();
-        // 统计卡片字段（前端 stats computed 使用）
-        data.put("active_scenes", activeScenes);
-        data.put("online_devices", onlineDevices);
-        data.put("today_alarms", todayAlarms);
-        data.put("today_inferences", 0);
-        // 告警饼图字段（AlarmHeatmapChart 使用）
-        data.put("critical_alarms", queryCount(
-                "SELECT COUNT(*) FROM alarm_record WHERE created_at >= CURRENT_DATE AND alarm_level = 'CRITICAL' AND is_sandbox = false"));
-        data.put("warning_alarms", queryCount(
-                "SELECT COUNT(*) FROM alarm_record WHERE created_at >= CURRENT_DATE AND alarm_level = 'WARNING' AND is_sandbox = false"));
-        data.put("info_alarms", queryCount(
-                "SELECT COUNT(*) FROM alarm_record WHERE created_at >= CURRENT_DATE AND alarm_level = 'INFO' AND is_sandbox = false"));
-        // 附加字段
-        data.put("total_scenes", queryCount("SELECT COUNT(*) FROM scene_config WHERE is_deleted = false"));
-        data.put("avg_infer_latency_ms", 0.0);
-        data.put("sandbox_sessions_running", 0);
-        data.put("generated_at", OffsetDateTime.now());
-        return ApiResponse.ok(data);
+    public ApiResponse<OverviewStatsDTO> overview(
+            @RequestParam(required = false) String factory,
+            @RequestParam(required = false) String sceneId) {
+        log.debug("查询概览统计 factory={} sceneId={}", factory, sceneId);
+        OverviewStatsDTO stats = dashboardService.getOverview(factory, sceneId);
+        return ApiResponse.ok(stats);
     }
 
-    /** 安全查询 COUNT，异常时返回 0 */
-    private int queryCount(String sql) {
-        try {
-            Integer result = prodJdbcTemplate.queryForObject(sql, Integer.class);
-            return result != null ? result : 0;
-        } catch (Exception e) {
-            log.warn("Dashboard 统计查询失败 sql={} error={}", sql, e.getMessage());
-            return 0;
-        }
+    /**
+     * GET /dashboard/factory-summary — 各厂部汇总统计（热力柱图）
+     * 规范：实时告警大屏开发优化计划.md §3.3
+     * 返回5个厂部的今日告警、活跃场景、在线设备、今日推理量
+     */
+    @GetMapping("/factory-summary")
+    public ApiResponse<List<FactorySummaryDTO>> factorySummary() {
+        log.debug("查询厂部汇总统计");
+        List<FactorySummaryDTO> summary = dashboardService.getFactorySummary();
+        return ApiResponse.ok(summary);
     }
 
     /**
@@ -104,22 +86,18 @@ public class DashboardController {
     /**
      * GET /dashboard/inference-trend — 推理统计趋势（近 N 天）
      * 返回字段与 InferenceTrendChart 对齐：time / count / alarms
+     *
+     * @param days    天数（默认7天）
+     * @param factory 厂部编码（可选）
+     * @param sceneId 场景ID（可选）
      */
     @GetMapping("/inference-trend")
-    public ApiResponse<List<Map<String, Object>>> inferenceTrend(
+    public ApiResponse<List<TrendPointDTO>> inferenceTrend(
             @RequestParam(defaultValue = "7") int days,
-            @RequestParam(required = false) String scene_id) {
-        // 暂返回空趋势数据，Sprint 3 接入 TDengine 后填充实际数据
-        List<Map<String, Object>> trend = new ArrayList<>();
-        for (int i = days - 1; i >= 0; i--) {
-            OffsetDateTime day = OffsetDateTime.now().minusDays(i);
-            trend.add(Map.of(
-                    "time", day.toLocalDate().toString(),
-                    "count", 0,
-                    "alarms", 0,
-                    "avg_latency_ms", 0.0
-            ));
-        }
+            @RequestParam(required = false) String factory,
+            @RequestParam(required = false) String sceneId) {
+        log.debug("查询推理趋势 days={} factory={} sceneId={}", days, factory, sceneId);
+        List<TrendPointDTO> trend = dashboardService.getInferenceTrend(days, factory, sceneId);
         return ApiResponse.ok(trend);
     }
 
