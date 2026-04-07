@@ -14,22 +14,31 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'small',
-  effect: 'light',
+  effect: 'dark',  // 统一使用 dark 效果
 })
 
+// 统一使用 effect="dark" + 调整颜色语义
 const defaultMap: Record<string, { label: string; type: '' | 'success' | 'warning' | 'danger' | 'info' }> = {
+  // 运行态
   active: { label: '运行中', type: 'success' },
-  inactive: { label: '已停用', type: 'info' },
-  draft: { label: '草稿', type: '' },
-  online: { label: '在线', type: 'success' },
-  offline: { label: '离线', type: 'danger' },
-  warning: { label: '告警', type: 'warning' },
   running: { label: '运行中', type: 'success' },
+  online: { label: '在线', type: 'success' },
   completed: { label: '已完成', type: 'success' },
-  failed: { label: '失败', type: 'danger' },
-  pending: { label: '等待中', type: 'info' },
+  // 停止态
+  inactive: { label: '已停用', type: 'info' },
+  offline: { label: '离线', type: 'danger' },
   cancelled: { label: '已取消', type: 'info' },
-  queued: { label: '排队中', type: '' },
+  // 中间态
+  pending: { label: '等待中', type: 'warning' },
+  queued: { label: '排队中', type: 'warning' },
+  draft: { label: '草稿', type: 'info' },
+  // 异常态
+  failed: { label: '失败', type: 'danger' },
+  warning: { label: '告警', type: 'warning' },
+  // 告警级别（AlarmListView 使用）
+  CRITICAL: { label: 'CRITICAL', type: 'danger' },
+  WARNING: { label: 'WARNING', type: 'warning' },
+  INFO: { label: 'INFO', type: 'info' },
 }
 
 const currentMap = computed(() => props.map || defaultMap)
@@ -37,3 +46,11 @@ const currentConfig = computed(() => currentMap.value[props.status] || { label: 
 const label = computed(() => currentConfig.value.label)
 const tagType = computed(() => currentConfig.value.type)
 </script>
+
+<style scoped lang="scss">
+// CRITICAL 标签加粗加边框强调
+:deep(.el-tag--danger.el-tag--dark) {
+  font-weight: 600;
+  border: 1px solid var(--tj-critical);
+}
+</style>
