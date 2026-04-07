@@ -53,6 +53,10 @@ export const simulationApi = {
   getExportStatus: (taskId: string) =>
     request.get(`/simulations/${taskId}/export-status`),
 
+  modelStatus: () => request.get('/simulations/model-status'),
+
+  warmupModel: () => request.post('/simulations/warmup-model'),
+
   uploadVideo: (file: File, sceneId: string, onProgress?: (percent: number) => void) => {
     const formData = new FormData()
     formData.append('file', file)

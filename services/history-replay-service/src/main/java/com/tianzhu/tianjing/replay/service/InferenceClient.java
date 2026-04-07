@@ -77,6 +77,62 @@ public class InferenceClient {
         }
     }
 
+    /**
+     * 查询推理代理健康状态（含模型是否已加载）
+     */
+    public ModelHealth getHealth() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(proxyUrl + "/health"))
+                    .GET()
+                    .timeout(Duration.ofSeconds(5))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return objectMapper.readValue(response.body(), ModelHealth.class);
+            }
+        } catch (Exception e) {
+            log.warn("推理代理健康检查失败: {}", e.getMessage());
+        }
+        return new ModelHealth("DOWN", "CLOUD-PROXY-V1", "onnx_cpu", false, null);
+    }
+
+    /**
+     * 预热推理模型：发送一张 1×1 黑色 JPEG，触发懒加载。
+     * 加载期间同步等待（最长 120s），完成后返回新的健康状态。
+     */
+    public ModelHealth warmup() {
+        // 1×1 黑色 JPEG 的 Base64（固定值，用于触发 ONNX Session 初始化）
+        String tinyJpegB64 =
+            "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoH" +
+            "BwYIDAoMCwsKCwsNCxAQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQME" +
+            "BAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU" +
+            "FBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/" +
+            "EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAA" +
+            "AAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/ACWAB//Z";
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("image_b64", tinyJpegB64);
+        body.put("scene_id", "warmup");
+        body.put("frame_id", "warmup");
+        body.put("timestamp_ms", 0);
+        body.put("is_sandbox", true);
+        body.put("conf_threshold", 0.99);
+        try {
+            String json = objectMapper.writeValueAsString(body);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(proxyUrl + "/infer"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .timeout(Duration.ofSeconds(120))
+                    .build();
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            log.info("推理模型预热完成");
+        } catch (Exception e) {
+            log.warn("推理模型预热请求失败: {}", e.getMessage());
+        }
+        return getHealth();
+    }
+
     // -------------------------------------------------------------------------
     // 推理代理响应 Schema（与 cloud-inference-proxy/src/main.py 对齐）
     // Python FastAPI 使用 snake_case，需 @JsonProperty 映射
@@ -104,5 +160,15 @@ public class InferenceClient {
             @JsonProperty("y1") double y1,
             @JsonProperty("x2") double x2,
             @JsonProperty("y2") double y2
+    ) {}
+
+    /** 推理代理健康状态（对应 /health 响应） */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ModelHealth(
+            @JsonProperty("status")             String status,
+            @JsonProperty("plugin_id")          String pluginId,
+            @JsonProperty("backend")            String backend,
+            @JsonProperty("onnx_model_loaded")  boolean onnxModelLoaded,
+            @JsonProperty("onnx_model_path")    String onnxModelPath
     ) {}
 }

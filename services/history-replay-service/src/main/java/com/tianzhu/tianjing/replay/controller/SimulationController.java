@@ -9,6 +9,7 @@ import com.tianzhu.tianjing.replay.dto.DatasetExportRequest;
 import com.tianzhu.tianjing.replay.dto.DatasetExportStatusDTO;
 import com.tianzhu.tianjing.replay.dto.SimulationCreateRequest;
 import com.tianzhu.tianjing.replay.service.DatasetExportService;
+import com.tianzhu.tianjing.replay.service.InferenceClient;
 import com.tianzhu.tianjing.replay.service.SimulationService;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
@@ -39,6 +40,7 @@ public class SimulationController {
 
     private final SimulationService simulationService;
     private final DatasetExportService datasetExportService;
+    private final InferenceClient inferenceClient;
 
     /** GET /simulations — 仿真任务列表 */
     @GetMapping
@@ -132,6 +134,25 @@ public class SimulationController {
             @PathVariable("task_id") String taskId) {
         SimulationTask task = simulationService.getTask(taskId);
         return ApiResponse.ok(datasetExportService.getExportStatus(task));
+    }
+
+    /**
+     * GET /simulations/model-status — 查询推理模型加载状态
+     * 前端新建任务前调用，判断是否需要预热
+     */
+    @GetMapping("/model-status")
+    public ApiResponse<InferenceClient.ModelHealth> modelStatus() {
+        return ApiResponse.ok(inferenceClient.getHealth());
+    }
+
+    /**
+     * POST /simulations/warmup-model — 预热推理模型（同步，等待加载完成）
+     * 发送 1×1 占位图像触发懒加载，最长等待 120s，返回最新健康状态
+     */
+    @PostMapping("/warmup-model")
+    public ApiResponse<InferenceClient.ModelHealth> warmupModel() {
+        InferenceClient.ModelHealth health = inferenceClient.warmup();
+        return ApiResponse.ok(health);
     }
 
     /** POST /simulations/{task_id}/videos 请求体 */

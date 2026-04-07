@@ -85,12 +85,19 @@ public class SimulationExecutor {
         int frameFps  = (algoConfig != null && algoConfig.frameFps()  > 0) ? algoConfig.frameFps()  : 1;
         String pluginId = (algoConfig != null && algoConfig.pluginId() != null) ? algoConfig.pluginId() : "CLOUD-PROXY-V1";
 
-        // 1. 标记 RUNNING
+        // 1. 标记 RUNNING，并检查推理模型是否就绪（未加载则自动预热）
         task.setStatus("RUNNING");
         task.setStartedAt(OffsetDateTime.now());
         task.setProgress(0);
         taskMapper.updateById(task);
         log.info("仿真开始 task_id={} plugin={} fps={}", taskId, pluginId, frameFps);
+
+        InferenceClient.ModelHealth health = inferenceClient.getHealth();
+        if (!health.onnxModelLoaded()) {
+            log.info("推理模型未就绪，开始自动预热 task_id={}", taskId);
+            health = inferenceClient.warmup();
+            log.info("推理模型预热完成 loaded={} task_id={}", health.onnxModelLoaded(), taskId);
+        }
 
         // 2. 从 simulation_video 表获取本任务全部视频（按 sort_order 顺序）
         //    若表中无记录（旧任务兼容），回退到 task.videoFileUrl

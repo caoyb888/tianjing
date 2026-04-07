@@ -72,6 +72,57 @@
             <el-option v-for="p in pluginOptions" :key="p.pluginId" :label="p.name" :value="p.pluginId" />
           </el-select>
         </el-form-item>
+
+        <!-- 模型加载状态提示 -->
+        <el-form-item label="推理引擎">
+          <div style="width: 100%">
+            <el-alert
+              v-if="modelStatus === 'loading'"
+              type="info"
+              :closable="false"
+              show-icon
+            >
+              <template #default>正在检测推理引擎状态...</template>
+            </el-alert>
+            <el-alert
+              v-else-if="modelStatus === 'loaded'"
+              type="success"
+              :closable="false"
+              show-icon
+            >
+              <template #default>推理引擎已就绪，可正常推理</template>
+            </el-alert>
+            <el-alert
+              v-else-if="modelStatus === 'unloaded'"
+              type="warning"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 8px"
+            >
+              <template #default>
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px">
+                  <span>推理模型尚未加载，直接创建任务将导致推理结果为空</span>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    :loading="warmingUp"
+                    @click="warmupModel"
+                  >
+                    {{ warmingUp ? '加载中...' : '立即加载推理模型' }}
+                  </el-button>
+                </div>
+              </template>
+            </el-alert>
+            <el-alert
+              v-else-if="modelStatus === 'error'"
+              type="error"
+              :closable="false"
+              show-icon
+            >
+              <template #default>推理引擎连接失败，请检查推理服务是否正常运行</template>
+            </el-alert>
+          </div>
+        </el-form-item>
         <el-form-item label="抽帧频率">
           <el-radio-group v-model="createForm.frameFps">
             <el-radio :value="1">1 fps（默认）</el-radio>
@@ -185,6 +236,10 @@ const pluginOptions = ref<{ pluginId: string; name: string }[]>([
   { pluginId: 'CLOUD-PROXY-V1', name: 'CLOUD-PROXY-V1（云端推理代理）' }
 ])
 
+// 模型状态：'loading' | 'loaded' | 'unloaded' | 'error'
+const modelStatus = ref<'loading' | 'loaded' | 'unloaded' | 'error'>('loading')
+const warmingUp = ref(false)
+
 interface SceneOption {
   sceneId: string
   sceneName: string
@@ -214,12 +269,44 @@ async function loadScenes() {
   }
 }
 
+async function checkModelStatus() {
+  modelStatus.value = 'loading'
+  try {
+    const res = await simulationApi.modelStatus()
+    const health = res.data.data
+    modelStatus.value = health?.onnxModelLoaded ? 'loaded' : 'unloaded'
+  } catch {
+    modelStatus.value = 'error'
+  }
+}
+
+async function warmupModel() {
+  warmingUp.value = true
+  modelStatus.value = 'loading'
+  try {
+    const res = await simulationApi.warmupModel()
+    const health = res.data.data
+    modelStatus.value = health?.onnxModelLoaded ? 'loaded' : 'error'
+    if (health?.onnxModelLoaded) {
+      ElMessage.success('推理模型加载成功，可以创建仿真任务了')
+    } else {
+      ElMessage.error('模型加载失败，请检查推理服务日志')
+    }
+  } catch {
+    modelStatus.value = 'error'
+    ElMessage.error('推理引擎连接失败')
+  } finally {
+    warmingUp.value = false
+  }
+}
+
 function openCreate() {
   createForm.sceneId = ''
   createForm.pluginId = 'CLOUD-PROXY-V1'
   createForm.frameFps = 1
   createForm.videos = [{ url: '', name: '', label: 'MIXED', progress: 0 }]
   showCreate.value = true
+  checkModelStatus()
 }
 
 function addVideoSlot() {
