@@ -1076,6 +1076,16 @@ tianjing_model_retrain_trigger_total{scene_id}         # Counter
       - @TableField(exist = false) — 非数据库字段
       - @TableLogic / @Version  — 逻辑删除/乐观锁专用注解
     违反此规范的字段在 Code Review 阶段必须拦截，不得合入 develop 分支。
+13. 修改 vite.config.ts 的 server.proxy 配置后，必须完整 kill+重启 Vite 进程，禁止依赖热重启
+    - Vite 的 "config change → server restarted" 属于进程内热重启，proxy 规则不能保证完整重新初始化
+    - 热重启后 proxy 失效的典型表现：代理路径（如 /minio-frames/...）返回 SPA 的 text/html fallback，
+      Content-Length ≈ 453 字节，而非后端/MinIO 的真实内容
+    - 排查命令：curl -sI http://localhost:5173/<代理路径>，检查 Content-Type 是否符合预期
+    - 正确重启方式（以 admin-web 为例）：
+        kill -9 $(ps aux | grep "vite --host 0.0.0.0" | grep -v grep | awk '{print $2}')
+        cd apps/admin-web && nohup node node_modules/.bin/vite --host 0.0.0.0 \
+          > /tmp/tianjing-logs/vite.log 2>&1 &
+    - HMR（组件热更新）无此问题，仅 proxy/plugins 等服务器级配置变更受影响
 ```
 
 ---
@@ -1116,9 +1126,10 @@ SCENE-STRIP-*     # 带钢厂
 
 ---
 
-*CLAUDE.md 版本：V1.2 · 编制日期：2026-04-02 · 天柱·天镜项目组*
+*CLAUDE.md 版本：V1.3 · 编制日期：2026-04-08 · 天柱·天镜项目组*
 *V1.1 变更：§15 新增 P1 规则 9-10（服务启动规范、DTO 强制规范），P2 规则 9-10（路由过渡规范、种子数据规范），源于 2026-04-01 调试实践总结*
 *V1.2 变更：§15 新增 P2 规则 11-12（Flyway Migration Entity 同步规范、禁止 MyBatis-Plus camelCase 自动推导），源于 2026-04-02 Entity 字段 DB 列名系统性修复总结*
+*V1.3 变更：§15 新增 P2 规则 13（Vite proxy 配置变更后必须完整 kill+重启进程），源于 2026-04-08 标注审核画布图片代理失效排查总结*
 
 *本文件是项目唯一技术行为约束文件，与方案 V2.0 保持一致。*
 *如本文件与口头约定存在冲突，以本文件为准。*
