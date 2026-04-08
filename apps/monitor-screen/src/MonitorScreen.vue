@@ -83,18 +83,18 @@
 
     <!-- ===== 中间图表行 ===== -->
     <section class="chart-row">
-      <!-- 推理趋势（左 2/3） -->
-      <div class="panel panel-trend">
+      <!-- 告警级别分布饼图（左 2/3） -->
+      <div class="panel panel-pie">
         <div class="panel-header">
-          <span class="panel-title">推理量趋势（近 7 天）</span>
-          <span class="panel-badge">{{ trendData.length }} 个数据点</span>
+          <span class="panel-title">告警级别分布（今日）</span>
+          <span v-if="hasFilter" class="filter-tag">已筛选</span>
         </div>
         <div class="panel-body">
-          <div ref="trendChartRef" class="echart-container"></div>
+          <div ref="pieChartRef" class="echart-container"></div>
         </div>
       </div>
 
-      <!-- 厂部热力柱图（新增，替换原饼图位置） -->
+      <!-- 厂部热力柱图（右 1/3） -->
       <div class="panel panel-heatmap">
         <div class="panel-header">
           <span class="panel-title">各厂部告警分布（今日）</span>
@@ -105,15 +105,15 @@
       </div>
     </section>
 
-    <!-- 告警级别分布饼图（移至下方） -->
+    <!-- 推理量趋势（移至下方，全宽） -->
     <section class="pie-row">
-      <div class="panel panel-pie">
+      <div class="panel panel-trend">
         <div class="panel-header">
-          <span class="panel-title">告警级别分布（今日）</span>
-          <span v-if="hasFilter" class="filter-tag">已筛选</span>
+          <span class="panel-title">推理量趋势（近 7 天）</span>
+          <span class="panel-badge">{{ trendData.length }} 个数据点</span>
         </div>
         <div class="panel-body">
-          <div ref="pieChartRef" class="echart-container"></div>
+          <div ref="trendChartRef" class="echart-container"></div>
         </div>
       </div>
     </section>
@@ -812,16 +812,16 @@ onUnmounted(() => {
 /* ── 图表行 ─────────────────────────────────────────────── */
 .chart-row {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1.8fr 1fr;
   gap: 16px;
-  flex: 0 0 290px;
+  flex: 0 0 240px;
 }
 
-/* ── 饼图行（新增） ─────────────────────────────────────── */
+/* ── 趋势图行 ───────────────────────────────────────────── */
 .pie-row {
   display: flex;
   gap: 16px;
-  flex: 0 0 120px;
+  flex: 0 0 240px;
   margin-top: 12px;
 }
 

@@ -189,24 +189,25 @@ public class DashboardService {
 
     /**
      * 查询今日推理量（TDengine）
-     * 表结构：infer_result(ts, confidence, class_name, ..., tags: scene_id, factory, is_sandbox)
+     * TDengine tag 名：factory_code（非 factory）；BOOL tag 过滤用 0/1
      */
     private long queryTodayInferences(String factory, String sceneId) {
         try {
             StringBuilder sql = new StringBuilder(
                     "SELECT COUNT(*) FROM infer_result " +
-                    "WHERE ts >= TODAY() AND is_sandbox = false"
+                    "WHERE ts >= TODAY() AND is_sandbox = 0"
             );
 
             if (factory != null && !factory.isEmpty()) {
-                sql.append(" AND factory = '").append(escapeSql(factory)).append("'");
+                sql.append(" AND factory_code = '").append(escapeSql(factory)).append("'");
             }
             if (sceneId != null && !sceneId.isEmpty()) {
                 sql.append(" AND scene_id = '").append(escapeSql(sceneId)).append("'");
             }
 
-            Long count = tdengineJdbcTemplate.queryForObject(sql.toString(), Long.class);
-            return count != null ? count : 0L;
+            // TDengine COUNT(*) 在无匹配数据时返回空结果集而非0行，用 query 替代 queryForObject
+            var rows = tdengineJdbcTemplate.queryForList(sql.toString(), Long.class);
+            return rows.isEmpty() ? 0L : (rows.get(0) != null ? rows.get(0) : 0L);
         } catch (Exception e) {
             log.warn("TDengine 查询今日推理量失败: {}", e.getMessage());
             return 0L;
@@ -215,23 +216,24 @@ public class DashboardService {
 
     /**
      * 查询平均推理延迟（TDengine，毫秒）
+     * TDengine AVG 在无数据时返回空结果集，用 queryForList 安全处理
      */
     private double queryAvgInferenceLatency(String factory, String sceneId) {
         try {
             StringBuilder sql = new StringBuilder(
                     "SELECT AVG(infer_ms) FROM infer_result " +
-                    "WHERE ts >= TODAY() AND is_sandbox = false"
+                    "WHERE ts >= TODAY() AND is_sandbox = 0"
             );
 
             if (factory != null && !factory.isEmpty()) {
-                sql.append(" AND factory = '").append(escapeSql(factory)).append("'");
+                sql.append(" AND factory_code = '").append(escapeSql(factory)).append("'");
             }
             if (sceneId != null && !sceneId.isEmpty()) {
                 sql.append(" AND scene_id = '").append(escapeSql(sceneId)).append("'");
             }
 
-            Double avg = tdengineJdbcTemplate.queryForObject(sql.toString(), Double.class);
-            return avg != null ? avg : 0.0;
+            var rows = tdengineJdbcTemplate.queryForList(sql.toString(), Double.class);
+            return rows.isEmpty() ? 0.0 : (rows.get(0) != null ? rows.get(0) : 0.0);
         } catch (Exception e) {
             log.warn("TDengine 查询平均延迟失败: {}", e.getMessage());
             return 0.0;
@@ -240,51 +242,53 @@ public class DashboardService {
 
     /**
      * 查询单日推理统计（TDengine）
+     * 修复：'date' + 1d 语法在 TDengine JDBC 中不生效，改为 Java 计算次日日期字符串
      */
     private TrendPointDTO queryDailyStats(String dateStr, String factory, String sceneId) {
         try {
-            // 查询该日总推理次数
+            // 次日日期（用于闭区间上界），避免 TDengine 不支持 + 1d 字面量运算
+            String nextDateStr = java.time.LocalDate.parse(dateStr)
+                    .plusDays(1).toString();
+
             StringBuilder countSql = new StringBuilder(
                     "SELECT COUNT(*) FROM infer_result " +
-                    "WHERE ts >= '" + dateStr + "' AND ts < '" + dateStr + "' + 1d " +
-                    "AND is_sandbox = false"
+                    "WHERE ts >= '" + dateStr + "' AND ts < '" + nextDateStr + "' AND is_sandbox = 0"
             );
 
-            // 查询该日异常数（is_anomaly = true）
+            // infer_result 无 is_anomaly 列，使用 anomaly_count > 0 替代
             StringBuilder alarmSql = new StringBuilder(
                     "SELECT COUNT(*) FROM infer_result " +
-                    "WHERE ts >= '" + dateStr + "' AND ts < '" + dateStr + "' + 1d " +
-                    "AND is_sandbox = false AND is_anomaly = true"
+                    "WHERE ts >= '" + dateStr + "' AND ts < '" + nextDateStr + "' AND is_sandbox = 0 AND anomaly_count > 0"
             );
 
-            // 查询平均延迟
             StringBuilder latencySql = new StringBuilder(
                     "SELECT AVG(infer_ms) FROM infer_result " +
-                    "WHERE ts >= '" + dateStr + "' AND ts < '" + dateStr + "' + 1d " +
-                    "AND is_sandbox = false"
+                    "WHERE ts >= '" + dateStr + "' AND ts < '" + nextDateStr + "' AND is_sandbox = 0"
             );
 
             if (factory != null && !factory.isEmpty()) {
-                countSql.append(" AND factory = '").append(escapeSql(factory)).append("'");
-                alarmSql.append(" AND factory = '").append(escapeSql(factory)).append("'");
-                latencySql.append(" AND factory = '").append(escapeSql(factory)).append("'");
+                String f = escapeSql(factory);
+                countSql.append(" AND factory_code = '").append(f).append("'");
+                alarmSql.append(" AND factory_code = '").append(f).append("'");
+                latencySql.append(" AND factory_code = '").append(f).append("'");
             }
             if (sceneId != null && !sceneId.isEmpty()) {
-                countSql.append(" AND scene_id = '").append(escapeSql(sceneId)).append("'");
-                alarmSql.append(" AND scene_id = '").append(escapeSql(sceneId)).append("'");
-                latencySql.append(" AND scene_id = '").append(escapeSql(sceneId)).append("'");
+                String s = escapeSql(sceneId);
+                countSql.append(" AND scene_id = '").append(s).append("'");
+                alarmSql.append(" AND scene_id = '").append(s).append("'");
+                latencySql.append(" AND scene_id = '").append(s).append("'");
             }
 
-            Long count = tdengineJdbcTemplate.queryForObject(countSql.toString(), Long.class);
-            Long alarms = tdengineJdbcTemplate.queryForObject(alarmSql.toString(), Long.class);
-            Double avgLatency = tdengineJdbcTemplate.queryForObject(latencySql.toString(), Double.class);
+            // TDengine 聚合查询无数据时返回空结果集，用 queryForList 安全处理
+            var cntRows = tdengineJdbcTemplate.queryForList(countSql.toString(), Long.class);
+            var almRows = tdengineJdbcTemplate.queryForList(alarmSql.toString(), Long.class);
+            var latRows = tdengineJdbcTemplate.queryForList(latencySql.toString(), Double.class);
 
-            return new TrendPointDTO(
-                    dateStr,
-                    count != null ? count : 0L,
-                    alarms != null ? alarms : 0L,
-                    avgLatency != null ? avgLatency : 0.0
-            );
+            long count    = cntRows.isEmpty() ? 0L   : (cntRows.get(0) != null ? cntRows.get(0) : 0L);
+            long alarms   = almRows.isEmpty() ? 0L   : (almRows.get(0) != null ? almRows.get(0) : 0L);
+            double avgLat = latRows.isEmpty() ? 0.0  : (latRows.get(0) != null ? latRows.get(0) : 0.0);
+
+            return new TrendPointDTO(dateStr, count, alarms, avgLat);
         } catch (Exception e) {
             log.warn("TDengine 查询每日统计失败 date={}: {}", dateStr, e.getMessage());
             return new TrendPointDTO(dateStr, 0L, 0L, 0.0);
