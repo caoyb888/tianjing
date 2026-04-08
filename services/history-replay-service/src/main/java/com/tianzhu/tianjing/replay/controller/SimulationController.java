@@ -5,9 +5,8 @@ import com.tianzhu.tianjing.common.response.PageResult;
 import com.tianzhu.tianjing.common.security.TianjingUserDetails;
 import com.tianzhu.tianjing.replay.domain.SimulationTask;
 import com.tianzhu.tianjing.replay.domain.SimulationVideo;
-import com.tianzhu.tianjing.replay.dto.DatasetExportRequest;
-import com.tianzhu.tianjing.replay.dto.DatasetExportStatusDTO;
-import com.tianzhu.tianjing.replay.dto.SimulationCreateRequest;
+import com.tianzhu.tianjing.replay.dto.*;
+import com.tianzhu.tianjing.replay.service.AnnotationReviewService;
 import com.tianzhu.tianjing.replay.service.DatasetExportService;
 import com.tianzhu.tianjing.replay.service.InferenceClient;
 import com.tianzhu.tianjing.replay.service.SimulationService;
@@ -41,6 +40,7 @@ public class SimulationController {
     private final SimulationService simulationService;
     private final DatasetExportService datasetExportService;
     private final InferenceClient inferenceClient;
+    private final AnnotationReviewService annotationReviewService;
 
     /** GET /simulations — 仿真任务列表 */
     @GetMapping
@@ -153,6 +153,85 @@ public class SimulationController {
     public ApiResponse<InferenceClient.ModelHealth> warmupModel() {
         InferenceClient.ModelHealth health = inferenceClient.warmup();
         return ApiResponse.ok(health);
+    }
+
+    // ============================================================================
+    // 标注审核接口（标注审核工具开发计划 V1.0）
+    // 路径前缀：/api/v1/simulations/{task_id}/review
+    // ============================================================================
+
+    /**
+     * POST /simulations/{task_id}/review/init — 初始化审核记录
+     * 幂等：若已存在记录则跳过，不覆盖
+     */
+    @PostMapping("/{task_id}/review/init")
+    public ApiResponse<AnnotationReviewService.InitReviewResult> initReview(
+            @PathVariable("task_id") String taskId) {
+        return ApiResponse.ok(annotationReviewService.initReview(taskId));
+    }
+
+    /**
+     * GET /simulations/{task_id}/review/stats — 审核进度统计
+     * 返回：总帧数 / 已审核 / 已通过 / 已拒绝 / 待审 / 进度百分比
+     */
+    @GetMapping("/{task_id}/review/stats")
+    public ApiResponse<ReviewStatsDTO> getReviewStats(
+            @PathVariable("task_id") String taskId) {
+        return ApiResponse.ok(annotationReviewService.getStats(taskId));
+    }
+
+    /**
+     * GET /simulations/{task_id}/review/frames — 分页获取帧列表（带审核状态）
+     * 用于缩略图导航
+     */
+    @GetMapping("/{task_id}/review/frames")
+    public ApiResponse<PageResult<FrameListItemDTO>> listReviewFrames(
+            @PathVariable("task_id") String taskId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String status) {
+        return ApiResponse.page(annotationReviewService.listFrames(taskId, page, size, status));
+    }
+
+    /**
+     * GET /simulations/{task_id}/review/frames/{frame_id} — 获取单帧详情
+     * 含原始标注 + 校正标注 + 图像URL
+     */
+    @GetMapping("/{task_id}/review/frames/{frame_id}")
+    public ApiResponse<FrameDetailDTO> getReviewFrame(
+            @PathVariable("task_id") String taskId,
+            @PathVariable("frame_id") String frameId) {
+        return ApiResponse.ok(annotationReviewService.getFrame(taskId, frameId));
+    }
+
+    /**
+     * PUT /simulations/{task_id}/review/frames/{frame_id} — 保存单帧校正结果
+     * 标注框 + 审核状态
+     */
+    @PutMapping("/{task_id}/review/frames/{frame_id}")
+    public ApiResponse<Void> saveReviewFrame(
+            @PathVariable("task_id") String taskId,
+            @PathVariable("frame_id") String frameId,
+            @Valid @RequestBody SaveFrameRequest request,
+            @AuthenticationPrincipal TianjingUserDetails user) {
+        annotationReviewService.saveFrame(taskId, frameId, request, user.getUsername());
+        return ApiResponse.ok();
+    }
+
+    /**
+     * POST /simulations/{task_id}/review/bulk-approve — 批量通过
+     * 支持按 frame_ids 列表或"全部未改动帧"批量通过
+     */
+    @PostMapping("/{task_id}/review/bulk-approve")
+    public ApiResponse<Map<String, Object>> bulkApprove(
+            @PathVariable("task_id") String taskId,
+            @Valid @RequestBody BulkApproveRequest request,
+            @AuthenticationPrincipal TianjingUserDetails user) {
+        int count = annotationReviewService.bulkApprove(taskId, request, user.getUsername());
+        return ApiResponse.ok(Map.of(
+                "processed_count", count,
+                "mode", request.mode()
+        ));
     }
 
     /** POST /simulations/{task_id}/videos 请求体 */

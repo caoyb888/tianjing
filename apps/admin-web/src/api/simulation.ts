@@ -71,4 +71,50 @@ export const simulationApi = {
       },
     })
   },
+
+  // ============================================================================
+  // 标注审核相关 API（标注审核工具开发计划 V1.0）
+  // ============================================================================
+
+  /** 初始化审核记录 */
+  initReview: (taskId: string) =>
+    request.post(`/simulations/${taskId}/review/init`),
+
+  /** 获取审核进度统计 */
+  getReviewStats: (taskId: string) =>
+    request.get(`/simulations/${taskId}/review/stats`),
+
+  /** 分页获取帧列表 */
+  listReviewFrames: (taskId: string, params?: {
+    page?: number
+    size?: number
+    status?: string
+  }) => request.get(`/simulations/${taskId}/review/frames`, { params }),
+
+  /** 获取单帧详情 */
+  getReviewFrame: (taskId: string, frameId: string) =>
+    request.get(`/simulations/${taskId}/review/frames/${frameId}`),
+
+  /** 保存单帧审核结果 */
+  saveReviewFrame: (taskId: string, frameId: string, data: {
+    reviewStatus: string
+    correctedDetections?: Array<{
+      classId: number
+      className: string
+      confidence: number
+      bbox: { x1: number; y1: number; x2: number; y2: number }
+    }> | null
+  }) => request.put(`/simulations/${taskId}/review/frames/${frameId}`, {
+    review_status: data.reviewStatus,
+    corrected_detections: data.correctedDetections,
+  }),
+
+  /** 批量通过 */
+  bulkApprove: (taskId: string, data: {
+    mode: 'all_unmodified' | 'by_ids'
+    frameIds?: string[]
+  }) => request.post(`/simulations/${taskId}/review/bulk-approve`, {
+    mode: data.mode,
+    frame_ids: data.frameIds,
+  }),
 }

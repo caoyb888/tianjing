@@ -101,6 +101,10 @@ public class SimulationTask {
     @Version
     private Integer version;
 
+    /** 审核进度：0=未开始，1~99=审核中，100=全部完成 */
+    @TableField("review_progress")
+    private Integer reviewProgress;
+
     /** 关联视频列表（非 DB 字段，由 Service 层填充后返回） */
     @TableField(exist = false)
     private List<SimulationVideo> videos;

@@ -169,6 +169,20 @@ export interface SandboxSession {
   comparedToProduction?: boolean
 }
 
+// 仿真视频（与后端 SimulationVideo 对应）
+export interface SimulationVideo {
+  id?: number
+  taskId: string
+  videoUrl: string
+  videoName?: string
+  sortOrder: number
+  label: 'NORMAL' | 'ABNORMAL' | 'MIXED'
+  status: string
+  totalFrames?: number
+  matchedAlarms?: number
+  errorMsg?: string
+}
+
 // 仿真任务（字段名与后端 SimulationTask 实体对齐）
 export interface SimulationTask {
   taskId: string
@@ -183,6 +197,9 @@ export interface SimulationTask {
   errorMsg?: string
   createdAt: string
   finishedAt?: string           // 对应实体 finishedAt，不是 completedAt
+  // 扩展字段
+  videos?: SimulationVideo[]    // 关联视频列表
+  reviewProgress?: number       // 审核进度 0-100
 }
 
 // 训练数据集

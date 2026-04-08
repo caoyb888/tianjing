@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 /**
  * 导出训练数据集请求
@@ -27,7 +28,15 @@ public record DatasetExportRequest(
 
         /** 是否包含负样本帧（无检测结果的帧），默认 true */
         @JsonProperty("include_negatives")
-        Boolean includeNegatives
+        Boolean includeNegatives,
+
+        /**
+         * 导出模式：ALL（全部帧）/ REVIEWED_ONLY（仅已审核通过帧）
+         * 默认 "ALL"（向后兼容）
+         */
+        @Pattern(regexp = "ALL|REVIEWED_ONLY", message = "export_mode 必须是 ALL 或 REVIEWED_ONLY")
+        @JsonProperty("export_mode")
+        String exportMode
 ) {
     public double effectiveConfThreshold() {
         return confThreshold != null ? confThreshold : 0.70;
@@ -35,5 +44,19 @@ public record DatasetExportRequest(
 
     public boolean effectiveIncludeNegatives() {
         return includeNegatives == null || includeNegatives;
+    }
+
+    /**
+     * 获取有效的导出模式，默认 ALL（向后兼容）
+     */
+    public String effectiveExportMode() {
+        return exportMode != null ? exportMode : "ALL";
+    }
+
+    /**
+     * 是否仅导出已审核通过的帧
+     */
+    public boolean isReviewedOnly() {
+        return "REVIEWED_ONLY".equals(effectiveExportMode());
     }
 }
