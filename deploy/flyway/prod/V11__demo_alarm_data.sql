@@ -1,11 +1,11 @@
 -- ============================================================
--- Flyway 迁移脚本 V10
+-- Flyway 迁移脚本 V11
 -- 数据库：tianjing_prod（生产库）
--- 说明：演示用告警数据 — 覆盖近 7 天（2026-04-01 至 2026-04-07）
---       共 6 个场景、3 种级别、约 92 条告警记录
+-- 说明：演示用告警数据 — 覆盖近 7 天（CURRENT_DATE 当天及前 6 天，滚动写法不过期）
+--       共 6 个场景、3 种级别、约 93 条告警记录
 --       同时修复 alarm_record 缺少 created_at 列的 Entity 字段不匹配问题
 --       参考：CLAUDE.md §15 P2 规则 11（Flyway Migration Entity 同步规范）
--- 编制：测试负责人 · 2026-04-07
+-- 编制：测试负责人 · 2026-04-08
 -- ============================================================
 
 -- ============================================================
@@ -39,21 +39,22 @@ DECLARE
     anomaly   TEXT;
     push_st   TEXT;
     alarm_ts  TIMESTAMPTZ;
-    seq       INT := 1;
+    seq       INT := 1001;
     date_idx  INT;
     scene_idx INT;
     hour_off  INT;
     min_off   INT;
 
     -- 每天每场景产生告警数 [date_idx 1..7][scene_idx 1..6]
+    -- date_idx=1 → CURRENT_DATE-6（6天前），date_idx=7 → CURRENT_DATE（今天）
     count_matrix INT[][] := ARRAY[
-        ARRAY[1, 2, 1, 2, 2, 2],   -- 04-01：10 条
-        ARRAY[2, 1, 2, 2, 2, 2],   -- 04-02：11 条
-        ARRAY[2, 2, 2, 2, 2, 2],   -- 04-03：12 条
-        ARRAY[2, 2, 2, 3, 2, 2],   -- 04-04：13 条
-        ARRAY[3, 2, 3, 3, 2, 2],   -- 04-05：15 条
-        ARRAY[3, 4, 3, 3, 3, 2],   -- 04-06：18 条
-        ARRAY[2, 3, 2, 3, 2, 2]    -- 04-07：14 条
+        ARRAY[1, 2, 1, 2, 2, 2],   -- 第1天（今天-6）：10 条
+        ARRAY[2, 1, 2, 2, 2, 2],   -- 第2天（今天-5）：11 条
+        ARRAY[2, 2, 2, 2, 2, 2],   -- 第3天（今天-4）：12 条
+        ARRAY[2, 2, 2, 3, 2, 2],   -- 第4天（今天-3）：13 条
+        ARRAY[3, 2, 3, 3, 2, 2],   -- 第5天（今天-2）：15 条
+        ARRAY[3, 4, 3, 3, 3, 2],   -- 第6天（今天-1）：18 条
+        ARRAY[2, 3, 2, 3, 2, 2]    -- 第7天（今天）  ：14 条
     ];
 
     -- 告警级别轮转（7元素循环，约 2/7 CRITICAL，3/7 WARNING，2/7 INFO）
@@ -64,8 +65,9 @@ DECLARE
     day_base TIMESTAMPTZ;
 BEGIN
     FOR date_idx IN 1..7 LOOP
-        -- 使用 UTC 基准时间，避免 +08 凌晨时间转换后落入3月分区
-        day_base := ('2026-04-0' || date_idx || ' 00:00:00+00')::TIMESTAMPTZ;
+        -- 使用 CURRENT_DATE 滚动偏移：date_idx=1 → 今天-6，date_idx=7 → 今天
+        -- DATE_TRUNC 截到 UTC 日零点，避免 +08 凌晨时间转换后落入前一天分区
+        day_base := DATE_TRUNC('day', NOW() AT TIME ZONE 'UTC') - ((7 - date_idx) * INTERVAL '1 day');
 
         FOR scene_idx IN 1..6 LOOP
             -- 按 scene_idx 设置场景参数（替代 2D 数组切片）
@@ -140,7 +142,7 @@ BEGIN
                 -- 异常类型（奇偶交替）
                 anomaly := CASE WHEN (seq % 2 = 0) THEN anomaly_a_val ELSE anomaly_b_val END;
 
-                -- 推送状态（今日保留 PENDING，历史设为 SENT）
+                -- 推送状态（date_idx=7 即今天保留 PENDING，历史设为 SENT）
                 push_st := CASE WHEN date_idx = 7 THEN 'PENDING' ELSE 'SENT' END;
 
                 INSERT INTO alarm_record (
@@ -177,7 +179,8 @@ BEGIN
                     END,
                     alarm_ts,
                     alarm_ts
-                );
+                )
+                ON CONFLICT (alarm_id) DO NOTHING;
 
                 seq := seq + 1;
             END LOOP;
