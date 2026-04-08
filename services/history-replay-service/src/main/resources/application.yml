@@ -38,6 +38,7 @@ tianjing:
     password: ${TIANJING_POSTGRES_TRAIN_PASSWORD:}
   minio:
     endpoint: ${TIANJING_MINIO_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${TIANJING_MINIO_PUBLIC_ENDPOINT:${tianjing.minio.endpoint}}
     sim-bucket: tianjing-sim-temp
     datasets-bucket: tianjing-datasets
   inference:

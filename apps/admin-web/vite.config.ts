@@ -31,6 +31,11 @@ export default defineConfig({
         target: 'http://localhost:8079',
         changeOrigin: true,
       },
+      '/minio-frames': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/minio-frames/, ''),
+      },
     },
   },
   css: {

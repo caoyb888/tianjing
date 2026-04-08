@@ -187,6 +187,15 @@ const routes: RouteRecordRaw[] = [
           roles: [UserRole.ADMIN, UserRole.SANDBOX_OPERATOR],
         },
       },
+      {
+        path: 'simulations/:taskId/review',
+        name: 'AnnotationReview',
+        component: () => import('@/views/simulation/AnnotationReviewView.vue'),
+        meta: {
+          title: '标注审核',
+          roles: [UserRole.ADMIN, UserRole.SANDBOX_OPERATOR, UserRole.SCENE_EDITOR],
+        },
+      },
       // 训练管理
       {
         path: 'training/datasets',

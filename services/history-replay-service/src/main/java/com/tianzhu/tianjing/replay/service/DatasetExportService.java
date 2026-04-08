@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.exception.ErrorCode;
 import com.tianzhu.tianjing.replay.domain.SimulationTask;
+import com.tianzhu.tianjing.replay.domain.entity.SimulationFrameReviewEntity;
 import com.tianzhu.tianjing.replay.dto.DatasetExportRequest;
 import com.tianzhu.tianjing.replay.dto.DatasetExportStatusDTO;
+import com.tianzhu.tianjing.replay.repository.SimulationFrameReviewMapper;
 import com.tianzhu.tianjing.replay.repository.SimulationTaskMapper;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
@@ -21,6 +23,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -33,15 +36,18 @@ import java.util.zip.ZipOutputStream;
 public class DatasetExportService {
 
     private final SimulationTaskMapper taskMapper;
+    private final SimulationFrameReviewMapper reviewMapper;
     private final MinioClient minioClient;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate trainJdbcTemplate;
 
     public DatasetExportService(SimulationTaskMapper taskMapper,
+                                SimulationFrameReviewMapper reviewMapper,
                                 MinioClient minioClient,
                                 ObjectMapper objectMapper,
                                 @Qualifier("trainJdbcTemplate") JdbcTemplate trainJdbcTemplate) {
         this.taskMapper       = taskMapper;
+        this.reviewMapper     = reviewMapper;
         this.minioClient      = minioClient;
         this.objectMapper     = objectMapper;
         this.trainJdbcTemplate = trainJdbcTemplate;
@@ -120,7 +126,8 @@ public class DatasetExportService {
 
     private void doExport(SimulationTask task, DatasetExportRequest req) throws Exception {
         String taskId = task.getTaskId();
-        log.info("开始导出数据集 task_id={} datasetVersionId={}", taskId, req.datasetVersionId());
+        log.info("开始导出数据集 task_id={} datasetVersionId={} exportMode={}",
+                taskId, req.datasetVersionId(), req.effectiveExportMode());
 
         // 1. 解析 result_json
         ResultJson resultJson = parseResultJson(task.getResultJson());
@@ -132,31 +139,66 @@ public class DatasetExportService {
         int totalFrames = frames.size();
         progressMap.put(taskId, 5);
 
-        // 2. 过滤：根据置信度阈值和是否包含负样本
+        // 2. 加载审核记录（如果存在）
+        Map<String, SimulationFrameReviewEntity> reviewMap = loadReviewMap(taskId);
+        boolean hasReview = !reviewMap.isEmpty();
+        if (hasReview) {
+            log.info("检测到审核记录 task_id={} reviewCount={}", taskId, reviewMap.size());
+        }
+
+        // 3. 过滤：根据审核状态、置信度阈值和是否包含负样本
         double confThreshold = req.effectiveConfThreshold();
         boolean includeNegatives = req.effectiveIncludeNegatives();
+        boolean reviewedOnly = req.isReviewedOnly();
 
         List<FrameResult> filtered = new ArrayList<>();
         for (FrameResult frame : frames) {
-            List<Detection> passedDetections = new ArrayList<>();
-            if (frame.detections() != null) {
-                for (Detection d : frame.detections()) {
-                    if (d.confidence() >= confThreshold) {
-                        passedDetections.add(d);
+            SimulationFrameReviewEntity review = reviewMap.get(frame.frameId());
+
+            // REVIEWED_ONLY 模式：只导出已审核通过的帧
+            if (reviewedOnly) {
+                if (review == null || !"APPROVED".equals(review.getReviewStatus())) {
+                    continue; // 跳过未审核或非通过的帧
+                }
+            }
+
+            // 有审核记录且状态为 REJECTED → 跳过此帧
+            if (review != null && "REJECTED".equals(review.getReviewStatus())) {
+                continue;
+            }
+
+            // 确定使用的检测框来源
+            List<Detection> detectionsToUse;
+            if (review != null && Boolean.TRUE.equals(review.getIsModified())
+                    && review.getCorrectedDetectionsJson() != null) {
+                // 使用人工校正结果（confidence=1.0，不再过滤）
+                detectionsToUse = parseReviewDetections(review.getCorrectedDetectionsJson());
+                log.debug("使用校正标注 task_id={} frame_id={} count={}",
+                        taskId, frame.frameId(), detectionsToUse.size());
+            } else {
+                // 使用原始推理结果，按 confThreshold 过滤
+                detectionsToUse = new ArrayList<>();
+                if (frame.detections() != null) {
+                    for (Detection d : frame.detections()) {
+                        if (d.confidence() >= confThreshold) {
+                            detectionsToUse.add(d);
+                        }
                     }
                 }
             }
-            boolean hasDetection = !passedDetections.isEmpty();
+
+            boolean hasDetection = !detectionsToUse.isEmpty();
             if (hasDetection || includeNegatives) {
                 filtered.add(new FrameResult(
                         frame.frameId(),
                         frame.frameUrl(),
                         frame.timestampMs(),
-                        passedDetections
+                        detectionsToUse
                 ));
             }
         }
-        log.info("过滤后帧数 {}/{} task_id={}", filtered.size(), totalFrames, taskId);
+        log.info("过滤后帧数 {}/{} task_id={} hasReview={}",
+                filtered.size(), totalFrames, taskId, hasReview);
         progressMap.put(taskId, 10);
 
         // 3. 构建 COCO 结构
@@ -455,6 +497,56 @@ public class DatasetExportService {
             return null;
         }
     }
+
+    // -------------------------------------------------------------------------
+    // 审核相关辅助方法
+    // -------------------------------------------------------------------------
+
+    /**
+     * 加载该任务的审核记录 Map（key: frameId → review record）
+     */
+    private Map<String, SimulationFrameReviewEntity> loadReviewMap(String taskId) {
+        try {
+            List<SimulationFrameReviewEntity> reviews = reviewMapper.selectByTaskId(taskId);
+            return reviews.stream()
+                    .collect(Collectors.toMap(SimulationFrameReviewEntity::getFrameId, r -> r));
+        } catch (Exception e) {
+            log.warn("加载审核记录失败 task_id={} error={}", taskId, e.getMessage());
+            return Collections.emptyMap();
+        }
+    }
+
+    /**
+     * 解析审核记录中的 corrected_detections_json
+     */
+    @SuppressWarnings("unchecked")
+    private List<Detection> parseReviewDetections(String json) {
+        if (json == null || json.isBlank() || "[]".equals(json)) {
+            return Collections.emptyList();
+        }
+        try {
+            List<Map<String, Object>> list = objectMapper.readValue(json,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+            List<Detection> result = new ArrayList<>();
+            for (Map<String, Object> d : list) {
+                Integer classId = (Integer) d.get("classId");
+                String className = (String) d.get("className");
+                double confidence = ((Number) d.get("confidence")).doubleValue();
+                Map<String, Object> bbox = (Map<String, Object>) d.get("bbox");
+                double x1 = ((Number) bbox.get("x1")).doubleValue();
+                double y1 = ((Number) bbox.get("y1")).doubleValue();
+                double x2 = ((Number) bbox.get("x2")).doubleValue();
+                double y2 = ((Number) bbox.get("y2")).doubleValue();
+                result.add(new Detection(classId, className, confidence, new BBox(x1, y1, x2, y2)));
+            }
+            return result;
+        } catch (JsonProcessingException e) {
+            log.warn("解析审核标注 JSON 失败: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+
 
     // result_json 结构
     record ResultJson(List<FrameResult> frames, String pluginId,

@@ -116,6 +116,34 @@
       </template>
     </el-dialog>
 
+    <!-- 标注审核入口（仿真完成后显示） -->
+    <el-card
+      v-if="task?.status === 'COMPLETED'"
+      shadow="never"
+      style="margin-top: 16px"
+    >
+      <template #header>
+        <span class="card-title">标注审核</span>
+      </template>
+
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <div>
+          <p style="margin: 0 0 8px 0; color: #606266; font-size: 14px">
+            审核进度：{{ task.reviewProgress || 0 }}%
+            <template v-if="task.reviewProgress === 100">
+              <el-tag type="success" size="small" style="margin-left: 8px">审核完成</el-tag>
+            </template>
+          </p>
+          <p style="margin: 0; color: #909399; font-size: 13px">
+            人工校正推理结果，提高训练数据质量
+          </p>
+        </div>
+        <el-button type="primary" @click="$router.push(`/simulations/${taskId}/review`)">
+          {{ task.reviewProgress === 100 ? '查看审核' : '开始审核' }} →
+        </el-button>
+      </div>
+    </el-card>
+
     <!-- 导出训练数据集区域（仿真完成后显示） -->
     <el-card
       v-if="task?.status === 'COMPLETED'"

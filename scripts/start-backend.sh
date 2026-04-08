@@ -62,6 +62,7 @@ export TIANJING_TDENGINE_PASSWORD=taosdata
 
 # MinIO（history-replay-service 使用）
 export TIANJING_MINIO_ENDPOINT=http://localhost:9000
+export TIANJING_MINIO_PUBLIC_ENDPOINT=/minio-frames
 export TIANJING_MINIO_ACCESS_KEY=minioadmin
 export TIANJING_MINIO_SECRET_KEY=minioadmin123
 
