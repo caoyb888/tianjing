@@ -697,8 +697,9 @@ onMounted(async () => {
       flex-direction: column;
       gap: 8px;
 
-      .el-button {
+      :deep(.el-button) {
         width: 100%;
+        margin-left: 0;
       }
     }
   }

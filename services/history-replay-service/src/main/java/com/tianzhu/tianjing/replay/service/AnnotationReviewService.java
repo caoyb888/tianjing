@@ -14,6 +14,7 @@ import com.tianzhu.tianjing.replay.repository.SimulationFrameReviewMapper;
 import com.tianzhu.tianjing.replay.repository.SimulationTaskMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,13 @@ public class AnnotationReviewService {
     private final SimulationFrameReviewMapper reviewMapper;
     private final SimulationTaskMapper taskMapper;
     private final ObjectMapper objectMapper;
+
+    /** MinIO 对外可访问地址（浏览器直接访问），用于替换内网 localhost URL */
+    @Value("${tianjing.minio.endpoint:http://localhost:9000}")
+    private String minioInternalEndpoint;
+
+    @Value("${tianjing.minio.public-endpoint:${tianjing.minio.endpoint}}")
+    private String minioPublicEndpoint;
 
     // ============================================================================
     // 1. 初始化审核记录
@@ -179,21 +187,24 @@ public class AnnotationReviewService {
             throw new BusinessException(ErrorCode.SIMULATION_TASK_NOT_FOUND, "仿真任务不存在: " + taskId);
         }
 
-        // 构建查询条件
-        LambdaQueryWrapper<SimulationFrameReviewEntity> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(SimulationFrameReviewEntity::getTaskId, taskId);
+        // 查询总数（count 查询不带 ORDER BY，避免 PostgreSQL 聚合列冲突）
+        LambdaQueryWrapper<SimulationFrameReviewEntity> countWrapper = Wrappers.lambdaQuery();
+        countWrapper.eq(SimulationFrameReviewEntity::getTaskId, taskId);
         if (status != null && !status.isBlank()) {
-            wrapper.eq(SimulationFrameReviewEntity::getReviewStatus, status);
+            countWrapper.eq(SimulationFrameReviewEntity::getReviewStatus, status);
         }
-        wrapper.orderByAsc(SimulationFrameReviewEntity::getFrameIndex);
+        long total = reviewMapper.selectCount(countWrapper);
 
-        // 查询总数
-        long total = reviewMapper.selectCount(wrapper);
-
-        // 分页查询
+        // 分页查询（带 ORDER BY + LIMIT/OFFSET）
+        LambdaQueryWrapper<SimulationFrameReviewEntity> listWrapper = Wrappers.lambdaQuery();
+        listWrapper.eq(SimulationFrameReviewEntity::getTaskId, taskId);
+        if (status != null && !status.isBlank()) {
+            listWrapper.eq(SimulationFrameReviewEntity::getReviewStatus, status);
+        }
+        listWrapper.orderByAsc(SimulationFrameReviewEntity::getFrameIndex);
         int offset = (page - 1) * size;
-        wrapper.last("LIMIT " + size + " OFFSET " + offset);
-        List<SimulationFrameReviewEntity> entities = reviewMapper.selectList(wrapper);
+        listWrapper.last("LIMIT " + size + " OFFSET " + offset);
+        List<SimulationFrameReviewEntity> entities = reviewMapper.selectList(listWrapper);
 
         // 转换为 DTO
         List<FrameListItemDTO> items = entities.stream().map(e -> {
@@ -204,7 +215,7 @@ public class AnnotationReviewService {
 
             return new FrameListItemDTO(
                     e.getFrameId(),
-                    e.getFrameUrl(),
+                    toPublicUrl(e.getFrameUrl()),
                     e.getFrameIndex(),
                     e.getReviewStatus(),
                     e.getIsModified(),
@@ -241,7 +252,7 @@ public class AnnotationReviewService {
 
         return new FrameDetailDTO(
                 entity.getFrameId(),
-                entity.getFrameUrl(),
+                toPublicUrl(entity.getFrameUrl()),
                 entity.getFrameIndex(),
                 entity.getReviewStatus(),
                 entity.getIsModified(),
@@ -465,6 +476,17 @@ public class AnnotationReviewService {
         } catch (JsonProcessingException e) {
             throw new RuntimeException("JSON 序列化失败", e);
         }
+    }
+
+    /**
+     * 将 MinIO 内网 URL 替换为浏览器可访问的公开地址
+     * 例：http://localhost:9000/... → http://10.30.10.49:9000/...
+     */
+    private String toPublicUrl(String url) {
+        if (url == null || minioInternalEndpoint.equals(minioPublicEndpoint)) {
+            return url;
+        }
+        return url.replace(minioInternalEndpoint, minioPublicEndpoint);
     }
 
     // ============================================================================
