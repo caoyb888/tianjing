@@ -1,6 +1,7 @@
 package com.tianzhu.tianjing.scene.domain;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.tianzhu.tianjing.scene.config.JsonbTypeHandler;
 import lombok.Data;
 
 import java.time.OffsetDateTime;
@@ -58,18 +59,18 @@ public class SceneConfig {
     @TableField("sandbox_enabled")
     private Boolean sandboxEnabled;
 
-    @TableField("workflow_json")
+    @TableField(value = "workflow_json", typeHandler = JsonbTypeHandler.class)
     private String workflowJson;
 
     /** 告警配置（JSONB 存储，对应列 alarm_config_json）*/
-    @TableField("alarm_config_json")
+    @TableField(value = "alarm_config_json", typeHandler = JsonbTypeHandler.class)
     private String alarmConfigJson;
 
     /** 算法参数扩展（JSONB 存储，对应列 algo_config_json）*/
-    @TableField("algo_config_json")
+    @TableField(value = "algo_config_json", typeHandler = JsonbTypeHandler.class)
     private String algoParamsJson;
 
-    @TableField("roi_config_json")
+    @TableField(value = "roi_config_json", typeHandler = JsonbTypeHandler.class)
     private String roiConfigJson;
 
     /** 乐观锁版本号 */

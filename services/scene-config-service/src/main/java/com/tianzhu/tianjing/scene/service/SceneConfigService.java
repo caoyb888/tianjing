@@ -278,7 +278,7 @@ public class SceneConfigService {
         }
         scene.setUpdatedBy(operator);
         sceneMapper.updateById(scene);
-        writeHistory(scene, "WORKFLOW_UPDATE", "保存算法编排", operator);
+        writeHistory(scene, "UPDATE", "保存算法编排", operator);
         log.info("保存工作流编排 scene_id={} operator={}", sceneId, operator);
         return SceneConfigDetail.from(sceneMapper.selectById(scene.getId()));
     }

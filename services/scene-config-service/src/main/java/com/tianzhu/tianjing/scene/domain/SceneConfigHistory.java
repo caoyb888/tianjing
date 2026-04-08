@@ -1,6 +1,7 @@
 package com.tianzhu.tianjing.scene.domain;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.tianzhu.tianjing.scene.config.JsonbTypeHandler;
 import lombok.Data;
 
 import java.time.OffsetDateTime;
@@ -24,7 +25,7 @@ public class SceneConfigHistory {
     private Integer configVersion;
 
     /** 变更后的完整配置 JSON 快照，DB列名 snapshot_json */
-    @TableField("snapshot_json")
+    @TableField(value = "snapshot_json", typeHandler = JsonbTypeHandler.class)
     private String snapshotJson;
 
     /** 操作类型：UPDATE / ENABLE / DISABLE / ROLLBACK */

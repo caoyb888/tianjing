@@ -10,13 +10,13 @@ import java.util.Optional;
 @Mapper
 public interface SceneConfigHistoryMapper extends BaseMapper<SceneConfigHistory> {
 
-    @Select("SELECT MAX(history_version) FROM scene_config_history WHERE scene_id = #{sceneId}")
+    @Select("SELECT MAX(config_version) FROM scene_config_history WHERE scene_id = #{sceneId}")
     Integer selectMaxVersion(String sceneId);
 
     @Select("""
         SELECT * FROM scene_config_history
         WHERE scene_id = #{sceneId}
-          AND history_version = #{version}
+          AND config_version = #{version}
         """)
     Optional<SceneConfigHistory> selectByVersion(String sceneId, int version);
 }
