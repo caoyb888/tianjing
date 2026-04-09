@@ -87,9 +87,9 @@ public class DashboardService {
         long todayInferences = queryTodayInferences(factory, sceneId);
 
         // 告警级别分布
-        int criticalAlarms = queryCount(alarmWhere + " AND alarm_level = 'CRITICAL'");
-        int warningAlarms = queryCount(alarmWhere + " AND alarm_level = 'WARNING'");
-        int infoAlarms = queryCount(alarmWhere + " AND alarm_level = 'INFO'");
+        int criticalAlarms = queryCount("SELECT COUNT(*) FROM alarm_record" + alarmWhere + " AND alarm_level = 'CRITICAL'");
+        int warningAlarms  = queryCount("SELECT COUNT(*) FROM alarm_record" + alarmWhere + " AND alarm_level = 'WARNING'");
+        int infoAlarms     = queryCount("SELECT COUNT(*) FROM alarm_record" + alarmWhere + " AND alarm_level = 'INFO'");
 
         // 总场景数
         int totalScenes = queryCount("SELECT COUNT(*) FROM scene_config" + whereClause);

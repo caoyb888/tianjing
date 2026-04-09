@@ -40,6 +40,8 @@ public class TDengineConfig {
         config.setMinimumIdle(2);
         config.setConnectionTimeout(5000);
         config.setPoolName("DashboardTDenginePool");
+        // -1：启动时不验证连接，TDengine 不可用时服务仍可启动，查询降级返回 0
+        config.setInitializationFailTimeout(-1);
         return new HikariDataSource(config);
     }
 

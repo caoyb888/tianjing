@@ -150,17 +150,24 @@ const stats = computed(() => [
 async function loadData() {
   loading.value = true
   try {
-    const [overviewRes, trendRes] = await Promise.all([
-      dashboardApi.getOverview(),
-      dashboardApi.getInferenceTrend({ days: 7 }),
-    ])
+    // overview 与 trend 独立请求：trend 依赖 TDengine JDBC，超时较长，
+    // 不能用 Promise.all，否则 trend 超时会导致 overview 也拿不到数据
+    const overviewRes = await dashboardApi.getOverview()
     overview.value = overviewRes.data.data
-    // inference-trend 直接返回趋势数组
+  } catch (e) {
+    console.error('Dashboard overview 加载失败', e)
+  } finally {
+    loading.value = false
+  }
+
+  // trend 单独加载，失败不影响统计卡片
+  try {
+    const trendRes = await dashboardApi.getInferenceTrend({ days: 7 } as any)
     trendData.value = Array.isArray(trendRes.data.data)
       ? trendRes.data.data
       : trendRes.data.data?.trend ?? []
-  } finally {
-    loading.value = false
+  } catch (e) {
+    console.warn('推理趋势加载失败（TDengine 连接异常）', e)
   }
 }
 
