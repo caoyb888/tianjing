@@ -1,12 +1,83 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Check, Close, ArrowRight, ArrowLeft as ArrowLeftIcon } from '@element-plus/icons-vue'
+import { ArrowLeft, Check, Close, ArrowRight, ArrowLeft as ArrowLeftIcon, Plus } from '@element-plus/icons-vue'
 import { simulationApi } from '@/api/simulation'
 import AnnotationCanvas from '@/components/annotation/AnnotationCanvas.vue'
 import { useAnnotationHotkeys } from '@/composables/useAnnotationHotkeys'
 import type { Detection } from '@/components/annotation/AnnotationCanvas.vue'
+
+// ============================================================================
+// 类别管理
+// ============================================================================
+
+/** 调色板（循环分配给新类别） */
+const COLOR_PALETTE = [
+  '#67c23a', '#e6a23c', '#f56c6c', '#409eff',
+  '#b37feb', '#13c2c2', '#fa8c16', '#a0d911',
+]
+
+interface ClassLabel {
+  name: string
+  color: string
+}
+
+/** 当前标注会话的类别列表（用户可增删） */
+const classLabels = ref<ClassLabel[]>([])
+
+/** 新增类别输入框内容 */
+const newClassName = ref('')
+
+/** 类别名 → 颜色 映射（传给 AnnotationCanvas） */
+const classColors = computed<Record<string, string>>(() =>
+  Object.fromEntries(classLabels.value.map(l => [l.name, l.color]))
+)
+
+/** 当前选中框的类别名 */
+const selectedBoxClassName = computed<string>(() => {
+  if (!selectedBoxId.value) return ''
+  return currentDetections.value.find(d => d.id === selectedBoxId.value)?.className ?? ''
+})
+
+/** 将类别名注册进列表（如不存在则自动添加） */
+function ensureClassLabel(name: string) {
+  if (!name || classLabels.value.some(l => l.name === name)) return
+  const color = COLOR_PALETTE[classLabels.value.length % COLOR_PALETTE.length]
+  classLabels.value.push({ name, color })
+}
+
+/** 用户点击"添加类别"按钮 */
+function addClassLabel() {
+  const name = newClassName.value.trim()
+  if (!name) return
+  if (classLabels.value.some(l => l.name === name)) {
+    ElMessage.warning('该类别已存在')
+    return
+  }
+  ensureClassLabel(name)
+  newClassName.value = ''
+}
+
+/** 删除类别（不影响已标注的框，框保留原 className） */
+function removeClassLabel(name: string) {
+  classLabels.value = classLabels.value.filter(l => l.name !== name)
+}
+
+/** 给选中框赋予类别 */
+function assignClass(label: ClassLabel) {
+  if (!selectedBoxId.value) return
+  canvasRef.value?.updateBoxClass(selectedBoxId.value, classLabels.value.indexOf(label), label.name)
+}
+
+/** 数字键快捷选类别（1~9） */
+function handleClassHotkey(e: KeyboardEvent) {
+  if (e.target instanceof HTMLInputElement) return
+  const n = parseInt(e.key)
+  if (n >= 1 && n <= classLabels.value.length && selectedBoxId.value) {
+    assignClass(classLabels.value[n - 1])
+  }
+}
 
 // ============================================================================
 // 路由和参数
@@ -286,8 +357,18 @@ useAnnotationHotkeys({
 // 生命周期
 // ============================================================================
 
+// 自动从已有检测框中提取类别（切换帧时同步）
+watch(currentDetections, (detections) => {
+  detections.forEach(d => ensureClassLabel(d.className))
+}, { immediate: true })
+
 onMounted(async () => {
+  window.addEventListener('keydown', handleClassHotkey)
   await initReview()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleClassHotkey)
 })
 </script>
 
@@ -363,6 +444,7 @@ onMounted(async () => {
             ref="canvasRef"
             :frame-url="currentFrame.frameUrl"
             v-model:detections="currentDetections"
+            :class-colors="classColors"
             @box-selected="selectedBoxId = $event"
           />
           <div v-else class="empty-state">
@@ -395,18 +477,65 @@ onMounted(async () => {
       <div class="right-panel">
         <div class="panel-title">操作面板</div>
 
-        <!-- 类别信息 -->
+        <!-- 类别管理 -->
+        <div class="section">
+          <h4>类别管理</h4>
+          <div class="class-input-row">
+            <el-input
+              v-model="newClassName"
+              placeholder="输入类别名"
+              size="small"
+              @keyup.enter="addClassLabel"
+            />
+            <el-button :icon="Plus" size="small" type="primary" @click="addClassLabel" />
+          </div>
+          <div class="class-list">
+            <div
+              v-for="(label, idx) in classLabels"
+              :key="label.name"
+              class="class-tag"
+            >
+              <span class="class-color-dot" :style="{ background: label.color }" />
+              <span class="class-name">{{ idx + 1 }}. {{ label.name }}</span>
+              <el-icon class="class-delete" @click="removeClassLabel(label.name)"><Close /></el-icon>
+            </div>
+            <div v-if="classLabels.length === 0" class="class-empty">暂无类别，请添加</div>
+          </div>
+        </div>
+
+        <!-- 当前框信息 -->
         <div class="section">
           <h4>当前框信息</h4>
           <div v-if="selectedBoxId" class="box-info">
-            <p>框ID: {{ selectedBoxId }}</p>
-            <el-button type="danger" size="small" @click="deleteSelectedBox">
+            <p class="box-id">框ID: {{ selectedBoxId }}</p>
+            <p v-if="selectedBoxClassName" class="box-class">
+              当前类别：
+              <span
+                class="class-badge"
+                :style="{ background: classColors[selectedBoxClassName] ?? '#67c23a' }"
+              >{{ selectedBoxClassName }}</span>
+            </p>
+            <!-- 类别选择按钮 -->
+            <div v-if="classLabels.length > 0" class="class-selector">
+              <div
+                v-for="(label, idx) in classLabels"
+                :key="label.name"
+                class="class-btn"
+                :class="{ active: selectedBoxClassName === label.name }"
+                :style="{ borderColor: label.color, background: selectedBoxClassName === label.name ? label.color : 'transparent' }"
+                @click="assignClass(label)"
+              >
+                <span class="class-btn-key">{{ idx + 1 }}</span>
+                {{ label.name }}
+              </div>
+            </div>
+            <el-button type="danger" size="small" style="margin-top: 8px" @click="deleteSelectedBox">
               删除选中框 (Delete)
             </el-button>
           </div>
           <div v-else class="box-info empty">
             <p>未选中框</p>
-            <p class="hint">点击框可选中，按 Delete 删除</p>
+            <p class="hint">点击框可选中，选中后点击类别按钮赋值</p>
           </div>
         </div>
 
@@ -420,6 +549,7 @@ onMounted(async () => {
             <li><kbd>R</kbd> 拒绝当前帧</li>
             <li><kbd>Delete</kbd> 删除选中框</li>
             <li><kbd>Esc</kbd> 取消选中</li>
+            <li><kbd>1</kbd>~<kbd>9</kbd> 快速选类别</li>
             <li>拖拽空白处画新框</li>
           </ul>
         </div>
@@ -660,7 +790,120 @@ onMounted(async () => {
       color: #303133;
     }
 
+    // 类别管理
+    .class-input-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .class-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      .class-tag {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background: #f4f4f5;
+        border-radius: 4px;
+        font-size: 13px;
+
+        .class-color-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+
+        .class-name {
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .class-delete {
+          cursor: pointer;
+          color: #909399;
+          flex-shrink: 0;
+          &:hover { color: #f56c6c; }
+        }
+      }
+
+      .class-empty {
+        font-size: 12px;
+        color: #c0c4cc;
+        text-align: center;
+        padding: 4px 0;
+      }
+    }
+
+    // 当前框信息
     .box-info {
+      font-size: 13px;
+
+      .box-id {
+        color: #909399;
+        margin: 0 0 6px 0;
+        font-size: 12px;
+        word-break: break-all;
+      }
+
+      .box-class {
+        margin: 0 0 10px 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .class-badge {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 10px;
+          color: white;
+          font-size: 12px;
+          font-weight: bold;
+        }
+      }
+
+      .class-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 8px;
+
+        .class-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 10px;
+          border: 2px solid #dcdfe6;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 13px;
+          transition: all 0.15s;
+          color: #303133;
+
+          &:hover { opacity: 0.8; }
+
+          &.active { color: white; }
+
+          .class-btn-key {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            line-height: 18px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 3px;
+            font-size: 11px;
+            flex-shrink: 0;
+          }
+        }
+      }
+
       &.empty {
         color: #909399;
 

@@ -19,6 +19,8 @@ interface Props {
   frameUrl: string
   /** 当前帧标注框（含原始 + 校正） */
   detections: Detection[]
+  /** 类别名 → 颜色映射，用于标签背景着色 */
+  classColors?: Record<string, string>
   /** 原图宽（默认 1920） */
   imageWidth?: number
   /** 原图高（默认 1080） */
@@ -35,7 +37,8 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   imageWidth: 1920,
   imageHeight: 1080,
-  readonly: false
+  readonly: false,
+  classColors: () => ({})
 })
 
 const emit = defineEmits<Emits>()
@@ -308,22 +311,24 @@ defineExpose({
         :class="['box-group', { selected: box.id === selectedId }]"
         @mousedown.stop="selectBox(box.id)"
       >
-        <!-- 框 -->
+        <!-- 框（按类别着色，选中态保持蓝色） -->
         <rect
           :x="coords.toDisplayX(box.bbox.x1)"
           :y="coords.toDisplayY(box.bbox.y1)"
           :width="coords.toDisplayWidth(box.bbox)"
           :height="coords.toDisplayHeight(box.bbox)"
           :class="['bbox-rect', { modified: box.isNew }]"
+          :style="box.id !== selectedId ? { stroke: props.classColors[box.className] ?? '#67c23a' } : {}"
         />
 
-        <!-- 标签文字背景 -->
+        <!-- 标签文字背景（按类别着色） -->
         <rect
           :x="coords.toDisplayX(box.bbox.x1)"
           :y="coords.toDisplayY(box.bbox.y1) - 20"
           :width="box.className.length * 12 + 8"
           height="20"
           class="label-bg"
+          :style="{ fill: props.classColors[box.className] ?? '#67c23a' }"
         />
 
         <!-- 标签文字 -->

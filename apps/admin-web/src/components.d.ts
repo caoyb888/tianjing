@@ -9,6 +9,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AlarmHeatmapChart: typeof import('./components/charts/AlarmHeatmapChart.vue')['default']
     AlarmImageViewer: typeof import('./components/business/AlarmImageViewer.vue')['default']
+    AnnotationCanvas: typeof import('./components/annotation/AnnotationCanvas.vue')['default']
     AppBreadcrumb: typeof import('./components/layout/AppBreadcrumb.vue')['default']
     AppFooter: typeof import('./components/layout/AppFooter.vue')['default']
     AppHeader: typeof import('./components/layout/AppHeader.vue')['default']
