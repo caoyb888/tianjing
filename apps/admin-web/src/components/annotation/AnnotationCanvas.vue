@@ -48,6 +48,7 @@ const emit = defineEmits<Emits>()
 // ============================================================================
 
 const wrapperRef = ref<HTMLElement | null>(null)
+const svgRef = ref<SVGSVGElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
 const isImageLoaded = ref(false)
 
@@ -104,9 +105,9 @@ const selectedBox = computed(() => {
 // 事件处理
 // ============================================================================
 
-/** 获取鼠标在显示坐标系中的位置 */
+/** 获取鼠标在 SVG 坐标系中的位置（相对于 SVG 左上角） */
 function getMousePos(e: MouseEvent): { x: number; y: number } {
-  const rect = wrapperRef.value?.getBoundingClientRect()
+  const rect = svgRef.value?.getBoundingClientRect()
   if (!rect) return { x: 0, y: 0 }
   return {
     x: e.clientX - rect.left,
@@ -296,6 +297,7 @@ defineExpose({
     <!-- SVG 覆盖层 -->
     <svg
       v-if="isImageLoaded"
+      ref="svgRef"
       class="annotation-layer"
       :width="coords.displayWidth.value"
       :height="coords.displayHeight.value"
