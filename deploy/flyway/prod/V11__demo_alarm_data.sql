@@ -22,7 +22,12 @@ ALTER TABLE alarm_record ALTER COLUMN created_at SET DEFAULT NOW();
 -- PART 1：演示用告警记录（DO 块批量生成，7 天 × 多场景）
 -- 场景覆盖：6 个生产场景，跨 5 个厂部
 -- 级别分布：CRITICAL ≈ 20%，WARNING ≈ 45%，INFO ≈ 35%
+-- 幂等处理：alarm_record 是分区表，不支持 ON CONFLICT，
+--           改为插入前先删除 seq ≥ 1001 的旧演示数据（V11 专属序号段）
 -- ============================================================
+DELETE FROM alarm_record
+WHERE alarm_id ~ '^ALM-[0-9]{8}-[0-9]{6}$'
+  AND SUBSTRING(alarm_id FROM 14)::INTEGER >= 1001;
 DO $$
 DECLARE
     -- 场景变量（独立声明，避免 PL/pgSQL 2D 数组切片限制）
@@ -179,8 +184,7 @@ BEGIN
                     END,
                     alarm_ts,
                     alarm_ts
-                )
-                ON CONFLICT (alarm_id) DO NOTHING;
+                );
 
                 seq := seq + 1;
             END LOOP;
