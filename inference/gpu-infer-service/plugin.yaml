@@ -1,0 +1,34 @@
+# 算法插件元信息（CLAUDE.md §6.3）
+plugin_id: "LOCAL-GPU-YOLO-V1"
+name: "V100 本地 GPU 目标检测引擎"
+version: "1.0.0"
+type: "detection"               # detection | segmentation | classification | measurement | enhancement
+backbone: "YOLOv8n"
+service_port: 8102
+infer_endpoint: "http://localhost:8102/infer"
+health_endpoint: "http://localhost:8102/actuator/health"
+supported_scenes:
+  - "SCENE-SINTER-*"            # 烧结厂（Sprint 3 主验证场景）
+  - "SCENE-STEEL-*"             # 炼钢厂
+  - "SCENE-STRIP-*"             # 带钢厂
+  - "SCENE-PELLET-*"            # 球团厂
+hardware_requirements:
+  min_gpu_vram_gb: 4
+  supports_tensorrt: true       # GPU-06: TensorRT FP16 Engine
+  supports_onnx: true           # GPU-03: ONNX Runtime GPU
+  gpu_device: "Tesla V100-SXM2-32GB"
+  cuda_version: "12.x"
+accuracy_metrics:
+  # Sprint 3 基础预训练权重，Sprint 4 专用模型微调后更新
+  map50: null
+  map50_95: null
+  inference_ms_gpu_p95_onnx: null     # 目标 ≤25ms（GPU-03 验收）
+  inference_ms_gpu_p95_tensorrt: null # 目标 ≤20ms（GPU-06 验收）
+backend_switch:
+  env_var: INFER_BACKEND         # GPU-07: onnx | tensorrt，无需重启容器
+  default: onnx
+notes: |
+  - 基础预训练 YOLOv8n（COCO 80 类），Sprint 4 用烧结看火专用标注数据微调
+  - TensorRT FP16 Engine 需先执行 scripts/convert_to_tensorrt.py 生成
+  - 本地开发环境以 uv 进程运行（start-backend.sh），生产环境使用 deploy/docker/Dockerfile.gpu-infer
+  - Docker GPU 直通需安装 nvidia-container-toolkit（生产 K8s 使用 GPU Operator）
