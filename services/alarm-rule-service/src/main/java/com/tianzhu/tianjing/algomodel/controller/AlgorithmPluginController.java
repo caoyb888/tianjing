@@ -52,7 +52,7 @@ public class AlgorithmPluginController {
         String sceneId = (plugin.supportedScenes() != null && !plugin.supportedScenes().isEmpty())
                 ? plugin.supportedScenes().get(0)
                 : "HEALTH-CHECK";
-        return ApiResponse.ok(healthChecker.check(pluginId, sceneId));
+        return ApiResponse.ok(healthChecker.check(pluginId, sceneId, plugin.serviceEndpoint()));
     }
 
     @PostMapping

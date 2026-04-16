@@ -135,7 +135,8 @@ is_port_listening() {
 }
 
 get_pid_on_port() {
-  ss -tlnp 2>/dev/null | grep ":$1 " | grep -oP 'pid=\K[0-9]+' | head -1
+  # 非 root 用户下 ss -tlnp 不含 pid= 信息，改用 sudo lsof 获取 PID
+  sudo lsof -ti :"$1" 2>/dev/null | head -1 || true
 }
 
 health_check() {
@@ -246,6 +247,7 @@ start_recording_replay_service() {
       --with "fastapi==0.110.0" \
       --with "uvicorn[standard]==0.29.0" \
       --with "pydantic==2.6.4" \
+      --with "numpy==1.26.4" \
       --with "kafka-python==2.0.2" \
       --with "minio==7.2.5" \
       --with "opencv-python-headless==4.9.0.80" \
@@ -305,6 +307,53 @@ stop_cloud_inference_proxy() {
   pid=$(get_pid_on_port 8092)
   if [ -n "$pid" ]; then
     kill "$pid" 2>/dev/null && echo -e "  ${YELLOW}停止${RESET} cloud-inference-proxy (PID=$pid)" || true
+  fi
+}
+
+# ─── infer-dispatcher（Python FastAPI + Kafka Consumer，端口 8103，GPU-05）────
+
+INFER_DISPATCHER_DIR="$ROOT_DIR/inference/infer-dispatcher"
+
+start_infer_dispatcher() {
+  if is_port_listening 8103; then
+    echo -e "  ${CYAN}跳过${RESET} infer-dispatcher — 端口 8103 已被占用（已运行）"
+    return 0
+  fi
+  if [ ! -f "$UV_BIN" ]; then
+    echo -e "  ${RED}跳过${RESET} infer-dispatcher — uv 未找到 ($UV_BIN)"
+    return 1
+  fi
+  local log="$LOG_DIR/infer-dispatcher.log"
+  (
+    cd "$INFER_DISPATCHER_DIR"
+    TIANJING_MINIO_ENDPOINT="http://localhost:9000" \
+    MINIO_ACCESS_KEY="minioadmin" \
+    MINIO_SECRET_KEY="minioadmin123" \
+    TIANJING_KAFKA_BOOTSTRAP_SERVERS="localhost:9094" \
+    GPU_INFER_URL="http://localhost:8102" \
+    INFER_PROXY_URL="http://localhost:8092" \
+    PORT=8103 \
+    env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+    nohup "$UV_BIN" run \
+      --python 3.10 \
+      --with "fastapi==0.110.0" \
+      --with "uvicorn[standard]==0.29.0" \
+      --with "pydantic==2.6.4" \
+      --with "kafka-python==2.0.2" \
+      --with "lz4==4.3.3" \
+      --with "minio==7.2.5" \
+      --with "httpx==0.27.0" \
+      --with "structlog==24.1.0" \
+      python3 src/main.py > "$log" 2>&1 &
+    echo -e "  ${GREEN}已启动${RESET} infer-dispatcher  (PID=$!, port=8103, log=$log)"
+  )
+}
+
+stop_infer_dispatcher() {
+  local pid
+  pid=$(get_pid_on_port 8103)
+  if [ -n "$pid" ]; then
+    kill "$pid" 2>/dev/null && echo -e "  ${YELLOW}停止${RESET} infer-dispatcher (PID=$pid)" || true
   fi
 }
 
@@ -385,7 +434,7 @@ show_status() {
     fi
   done
   # 检查 Python 推理服务（不在 SERVICES 数组中）
-  for entry in "gpu-infer-service:8102" "recording-replay-service:8091" "cloud-inference-proxy:8092"; do
+  for entry in "gpu-infer-service:8102" "infer-dispatcher:8103" "recording-replay-service:8091" "cloud-inference-proxy:8092"; do
     local name=${entry%%:*} port=${entry##*:}
     local code
     code=$(health_check "$port")
@@ -399,7 +448,7 @@ show_status() {
     fi
   done
   echo ""
-  local total=$((${#SERVICES[@]} + 3))
+  local total=$((${#SERVICES[@]} + 4))
   if [ "$fail" -eq 0 ]; then
     echo -e "${GREEN}${BOLD}全部 $ok/$total 服务正常运行${RESET}"
   else
@@ -418,6 +467,7 @@ case "$MODE" in
       stop_service "${entry%%:*}" "${entry##*:}"
     done
     stop_gpu_infer_service
+    stop_infer_dispatcher
     stop_recording_replay_service
     stop_cloud_inference_proxy
     stop_gateway
@@ -442,6 +492,7 @@ case "$MODE" in
       stop_service "${entry%%:*}" "${entry##*:}"
     done
     stop_gpu_infer_service
+    stop_infer_dispatcher
     stop_recording_replay_service
     stop_cloud_inference_proxy
     stop_gateway
@@ -463,6 +514,7 @@ esac
 echo -e "\n${BOLD}▶ 启动 API 网关 + 推理代理 + 后端服务...${RESET}"
 start_gateway
 start_gpu_infer_service
+start_infer_dispatcher
 start_recording_replay_service
 start_cloud_inference_proxy
 for entry in "${SERVICES[@]}"; do

@@ -142,6 +142,7 @@ export interface AlgorithmPlugin {
   }
   description?: string           // 算法简要描述
   businessDimension?: string     // 适合的业务维度
+  uiSchemaJson?: string          // 低代码编排器动态表单 Schema（JSON Schema Draft-07 子集）
 }
 
 // 模型版本

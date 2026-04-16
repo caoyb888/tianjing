@@ -29,7 +29,19 @@ public record AlgorithmPluginDetail(
         /** 算法简要描述 */
         String description,
         /** 适合的业务维度 */
-        String businessDimension
+        String businessDimension,
+        /**
+         * 低代码编排器属性面板动态表单渲染 Schema（JSON Schema Draft-07 子集）。
+         * 供前端工作流节点渲染 conf_threshold / iou_threshold 等可配置参数的滑块控件。
+         * 原样透传 DB 中 ui_schema_json 列的 JSON 字符串，由前端解析。
+         */
+        String uiSchemaJson,
+        /**
+         * 推理服务端点 URL，从 metadata_json.service_endpoint 解析。
+         * LOCAL_GPU 插件指向本地 GPU 推理服务（如 http://localhost:8102），
+         * CLOUD_API 插件为 null（健康检查走 proxyUrl 默认配置）。
+         */
+        String serviceEndpoint
 ) {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .findAndRegisterModules();
@@ -40,6 +52,7 @@ public record AlgorithmPluginDetail(
         accuracy.put("inferenceMs", 0);
 
         String raw = p.getMetadataJson();
+        String serviceEndpoint = null;
         if (raw != null && !raw.isBlank() && !raw.equals("{}")) {
             try {
                 JsonNode meta = MAPPER.readTree(raw);
@@ -65,6 +78,11 @@ public record AlgorithmPluginDetail(
                         accuracy.put("inferenceMs", cpuMs.asInt());
                     }
                 }
+                // service_endpoint（LOCAL_GPU 插件的推理服务地址）
+                JsonNode ep = meta.get("service_endpoint");
+                if (ep != null && !ep.isNull() && !ep.asText().isBlank()) {
+                    serviceEndpoint = ep.asText();
+                }
             } catch (Exception ignored) {
                 // 解析失败返回默认值
             }
@@ -82,7 +100,9 @@ public record AlgorithmPluginDetail(
                 accuracy,
                 p.getCreatedAt(),
                 p.getDescription(),
-                p.getBusinessDimension()
+                p.getBusinessDimension(),
+                p.getUiSchemaJson(),
+                serviceEndpoint
         );
     }
 }

@@ -36,7 +36,10 @@ public class PluginHealthChecker {
     @Value("${tianjing.inference.proxy-url:http://localhost:8092}")
     private String proxyUrl;
 
+    // 强制 HTTP/1.1：uvicorn（FastAPI 推理服务）不支持 H2C Upgrade，
+    // Java HttpClient 默认尝试 HTTP/2 升级时请求体会丢失，导致 Pydantic 返回 422
     private final HttpClient httpClient = HttpClient.newBuilder()
+            .version(java.net.http.HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
@@ -50,8 +53,11 @@ public class PluginHealthChecker {
      * 2. 发送至推理代理 POST /infer（is_sandbox=true）
      * 3. 解析响应，返回可用性结果
      */
-    public PluginHealthResult check(String pluginId, String sceneId) {
+    public PluginHealthResult check(String pluginId, String sceneId, String serviceEndpoint) {
         long startMs = System.currentTimeMillis();
+        // serviceEndpoint 优先（LOCAL_GPU 插件有自己的推理地址）；否则回退到 proxyUrl
+        String targetUrl = (serviceEndpoint != null && !serviceEndpoint.isBlank())
+                ? serviceEndpoint : proxyUrl;
         try {
             // 1. 生成测试图（64×64 暗灰色，模拟工业摄像头低曝光帧）
             String imageB64 = generateTestImageB64();
@@ -67,7 +73,7 @@ public class PluginHealthChecker {
 
             String json = objectMapper.writeValueAsString(body);
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(proxyUrl + "/infer"))
+                    .uri(URI.create(targetUrl + "/infer"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .timeout(Duration.ofSeconds(15))
@@ -94,7 +100,7 @@ public class PluginHealthChecker {
 
         } catch (java.net.ConnectException e) {
             long elapsed = System.currentTimeMillis() - startMs;
-            String msg = "无法连接推理代理（" + proxyUrl + "），请确认服务已启动";
+            String msg = "无法连接推理服务（" + targetUrl + "），请确认服务已启动";
             log.warn("算法健康检测失败（连接拒绝）plugin_id={}", pluginId);
             return PluginHealthResult.fail(elapsed, msg, null);
         } catch (java.net.http.HttpTimeoutException e) {
