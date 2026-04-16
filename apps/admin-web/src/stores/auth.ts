@@ -5,8 +5,9 @@ import { authApi } from '@/api/auth'
 import { tokenHolder } from '@/utils/tokenHolder'
 
 export const useAuthStore = defineStore('auth', () => {
-  // Token 只存内存，禁止持久化至 localStorage（安全规范）
-  const accessToken = ref<string>('')
+  // Token 存 sessionStorage（tab 关闭自动清除），禁止持久化至 localStorage（安全规范）
+  // 页面刷新时从 tokenHolder 恢复，避免重复登录
+  const accessToken = ref<string>(tokenHolder.get())
   const refreshToken = ref<string>('')
   const userInfo = ref<UserInfo | null>(null)
 
