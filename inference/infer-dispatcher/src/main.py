@@ -167,6 +167,8 @@ def _process_frame(frame: dict) -> None:
             "inference_time_ms": infer_result.get("inference_time_ms", 0),
             "timestamp_ms":     infer_result.get("timestamp_ms", frame["timestamp_ms"]),
             "backend":          infer_result.get("backend", "unknown"),
+            "image_url":        frame.get("image_url", ""),   # 透传原始帧 MinIO URL，供大屏实时渲染
+            "factory":          frame.get("factory", ""),     # 透传厂部，供 result-aggregate-service 写 TDengine TAG
             "dispatcher_total_ms": round((time.perf_counter() - t_start) * 1000, 2),
         }
 

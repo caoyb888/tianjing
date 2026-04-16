@@ -16,6 +16,12 @@ spring:
       password: ${TIANJING_REDIS_PASSWORD:}
   kafka:
     bootstrap-servers: ${TIANJING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: compare-dashboard-live-prod-cg
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: true
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml

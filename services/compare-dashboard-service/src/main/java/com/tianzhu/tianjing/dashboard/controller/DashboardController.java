@@ -5,6 +5,7 @@ import com.tianzhu.tianjing.dashboard.dto.FactorySummaryDTO;
 import com.tianzhu.tianjing.dashboard.dto.OverviewStatsDTO;
 import com.tianzhu.tianjing.dashboard.dto.TrendPointDTO;
 import com.tianzhu.tianjing.dashboard.service.DashboardService;
+import com.tianzhu.tianjing.dashboard.service.LiveStreamService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -28,6 +29,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class DashboardController {
 
     private final DashboardService dashboardService;
+    private final LiveStreamService liveStreamService;
 
     /** SSE 客户端列表（线程安全） */
     private final List<SseEmitter> sseClients = new CopyOnWriteArrayList<>();
@@ -99,6 +101,25 @@ public class DashboardController {
         log.debug("查询推理趋势 days={} factory={} sceneId={}", days, factory, sceneId);
         List<TrendPointDTO> trend = dashboardService.getInferenceTrend(days, factory, sceneId);
         return ApiResponse.ok(trend);
+    }
+
+    /**
+     * GET /dashboard/infer/live-stream — 实时推理帧 SSE 流（大屏实时推理画面）
+     * 前端使用 EventSource 订阅，每帧触发一次 "frame" 事件。
+     * 事件数据包含 image_url（minio:// 格式）和 detections，供大屏 Canvas 渲染。
+     *
+     * 规范：CLAUDE.md §11.1（Sandbox 帧在 LiveStreamService 消费时已过滤）
+     */
+    @GetMapping(value = "/infer/live-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter liveStream() {
+        SseEmitter emitter = liveStreamService.subscribe();
+        // 发送连接确认
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("connected")
+                    .data("{\"message\":\"实时推理流已建立\"}"));
+        } catch (Exception ignored) {}
+        return emitter;
     }
 
     /**

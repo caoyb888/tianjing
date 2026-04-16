@@ -118,9 +118,13 @@
       </div>
     </section>
 
-    <!-- ===== 实时告警表格 ===== -->
+    <!-- ===== 实时推理画面 + 告警表格 ===== -->
     <section class="alarm-section">
-      <div class="panel">
+      <!-- 左：实时推理画面 -->
+      <InferLivePanel :token="accessToken" class="live-panel-slot" />
+
+      <!-- 右：告警表格面板 -->
+      <div class="panel alarm-panel">
         <div class="panel-header">
           <span class="panel-title">实时告警</span>
           <span class="panel-badge blink-badge" v-if="criticalCount > 0">
@@ -181,6 +185,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
 import dayjs from 'dayjs'
+import InferLivePanel from './components/InferLivePanel.vue'
 import {
   monitorApi,
   FACTORY_OPTIONS,
@@ -191,6 +196,9 @@ import {
   type SceneOption,
   type FactorySummary,
 } from './api/index'
+
+// ── SSE 鉴权 Token ────────────────────────────────────────
+const accessToken = ref(localStorage.getItem('_tj_access_token') ?? '')
 
 // ── 常量映射 ──────────────────────────────────────────────
 const LEVEL_LABEL: Record<string, string> = {
@@ -895,15 +903,30 @@ onUnmounted(() => {
   height: 100%;
 }
 
-/* ── 实时告警 ───────────────────────────────────────────── */
+/* ── 实时推理画面 + 告警表格 ───────────────────────────── */
 .alarm-section {
   flex: 1;
   margin: 12px 0 12px;
   min-height: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
 
   .panel {
     height: 100%;
   }
+}
+
+/* 左侧实时推理画面：固定宽度 */
+.live-panel-slot {
+  flex: 0 0 520px;
+  height: 100%;
+}
+
+/* 右侧告警表格：占满剩余宽度 */
+.alarm-panel {
+  flex: 1;
+  min-width: 0;
 }
 
 .table-body {

@@ -28,7 +28,10 @@ public class InferResultMessage {
     private double inferenceTimeMs;
     @JsonProperty("timestamp_ms")
     private long timestampMs;
-    /** 厂部（来自场景配置，由推理服务透传） */
+    /** 原始帧 MinIO URL（minio://bucket/path），供大屏实时推理画面渲染 */
+    @JsonProperty("image_url")
+    private String imageUrl;
+    /** 厂部（来自场景配置，由 infer-dispatcher 透传） */
     private String factory;
 
     @Data
