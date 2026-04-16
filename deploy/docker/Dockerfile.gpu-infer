@@ -1,0 +1,84 @@
+# ============================================================
+# 天柱·天镜 GPU 推理服务容器镜像
+# Sprint: GPU-02（V3.0 阶段二）
+#
+# 基础镜像：python:3.10.14-slim-bookworm（方案B优化版）
+#   - 极简 Python 3.10 基础镜像（~130MB）
+#   - onnxruntime-gpu 1.19.x 自带 CUDA 12.x 运行时，无需独立 CUDA 基础镜像
+#   - 镜像总大小目标：<3GB
+#   - 无需 NGC 账号，Docker Hub 公开镜像
+#
+# 功能：
+#   INFER_BACKEND=onnx（默认）GPU 推理，CUDA 由 onnxruntime-gpu 内置提供
+#   TensorRT 后端（GPU-06/07）待 NGC 镜像就绪后切换至方案A
+#   服务端口：8102
+#   插件 ID：LOCAL-GPU-YOLO-V1
+#
+# 构建（在项目根目录执行）：
+#   docker build -f deploy/docker/Dockerfile.gpu-infer \
+#     -t tianjing/gpu-infer-service:1.0.0 .
+#
+# 运行（需要 NVIDIA Docker Runtime）：
+#   docker run --gpus all --rm \
+#     -p 8102:8102 \
+#     -v /models:/models:ro \
+#     -e ONNX_MODEL_PATH=/models/yolov8n.onnx \
+#     -e INFER_BACKEND=onnx \
+#     tianjing/gpu-infer-service:1.0.0
+# ============================================================
+
+# 使用精确版本号（CLAUDE.md §13.3 禁止 :latest）
+# nvidia/cuda:12.3.2-base ~340MB，只含 CUDA runtime（libcudart）
+# onnxruntime-gpu 还需要 libcublas + libcudnn，单独通过 apt 安装最小集
+FROM nvidia/cuda:12.3.2-base-ubuntu22.04
+
+# ── 非 root 用户运行（CLAUDE.md §13.3）──────────────────────
+RUN useradd -m -u 1000 tianjing
+# /models 目录只读挂载，tianjing 用户需要读权限
+RUN mkdir -p /models /app && chown -R tianjing:tianjing /app
+
+WORKDIR /app
+
+# ── 安装 Python 3.10 + 系统依赖 + CUDA 最小库 ────────────────
+# libcublas-12-3     ：提供 libcublasLt.so.12（onnxruntime-gpu 必需）
+# libcudnn9-cuda-12  ：提供 libcudnn.so.9（onnxruntime-gpu 必需）
+# 两者合计约 700MB，是 onnxruntime-gpu GPU 模式的最小依赖集
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 \
+    python3.10-dev \
+    python3-pip \
+    curl \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libcublas-12-3 \
+    libcurand-12-3 \
+    libcufft-12-3 \
+    "libcudnn9-cuda-12=9.2.1.18-1" \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    # 移除 cuda-compat（宿主机驱动 570 原生支持 CUDA 12.3 runtime，无需 compat 机制；
+    # compat 目录内的旧版 libcuda.so.545 会与宿主注入的 libcuda.so.570 冲突）
+    && rm -rf /usr/local/cuda/compat/
+
+# ── 安装 Python 依赖（固定版本，CLAUDE.md §2.3）─────────────
+COPY inference/gpu-infer-service/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# ── 复制服务代码 ──────────────────────────────────────────────
+COPY inference/gpu-infer-service/src/ /app/src/
+
+USER tianjing
+
+# ── 健康检查 ─────────────────────────────────────────────────
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8102/actuator/health || exit 1
+
+# ── 服务端口 ─────────────────────────────────────────────────
+EXPOSE 8102
+
+# ── 启动命令 ─────────────────────────────────────────────────
+CMD ["python3", "src/main.py"]
