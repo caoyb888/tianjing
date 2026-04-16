@@ -219,10 +219,54 @@ stop_gateway() {
   fi
 }
 
+# ─── recording-replay-service（Python FastAPI，端口 8091）───────────────────
+
+RECORDING_REPLAY_DIR="$ROOT_DIR/inference/recording-replay-service"
+UV_BIN="/home/tzai/.local/bin/uv"
+
+start_recording_replay_service() {
+  if is_port_listening 8091; then
+    echo -e "  ${CYAN}跳过${RESET} recording-replay-service — 端口 8091 已被占用（已运行）"
+    return 0
+  fi
+  if [ ! -f "$UV_BIN" ]; then
+    echo -e "  ${RED}跳过${RESET} recording-replay-service — uv 未找到 ($UV_BIN)"
+    return 1
+  fi
+  local log="$LOG_DIR/recording-replay-service.log"
+  (
+    cd "$RECORDING_REPLAY_DIR"
+    TIANJING_MINIO_ENDPOINT="http://localhost:9000" \
+    MINIO_ACCESS_KEY="minioadmin" \
+    MINIO_SECRET_KEY="minioadmin123" \
+    TIANJING_KAFKA_BOOTSTRAP_SERVERS="localhost:9094" \
+    env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+    nohup "$UV_BIN" run \
+      --python 3.10 \
+      --with "fastapi==0.110.0" \
+      --with "uvicorn[standard]==0.29.0" \
+      --with "pydantic==2.6.4" \
+      --with "kafka-python==2.0.2" \
+      --with "minio==7.2.5" \
+      --with "opencv-python-headless==4.9.0.80" \
+      --with "structlog==24.1.0" \
+      --with "python-multipart==0.0.9" \
+      python3 src/main.py > "$log" 2>&1 &
+    echo -e "  ${GREEN}已启动${RESET} recording-replay-service  (PID=$!, port=8091, log=$log)"
+  )
+}
+
+stop_recording_replay_service() {
+  local pid
+  pid=$(get_pid_on_port 8091)
+  if [ -n "$pid" ]; then
+    kill "$pid" 2>/dev/null && echo -e "  ${YELLOW}停止${RESET} recording-replay-service (PID=$pid)" || true
+  fi
+}
+
 # ─── cloud-inference-proxy（Python FastAPI，端口 8092）────────────────────────
 
 CLOUD_INFER_DIR="$ROOT_DIR/inference/cloud-inference-proxy"
-UV_BIN="/home/xintong/.local/bin/uv"
 
 start_cloud_inference_proxy() {
   if is_port_listening 8092; then
@@ -264,6 +308,54 @@ stop_cloud_inference_proxy() {
   fi
 }
 
+# ─── gpu-infer-service（Python FastAPI，端口 8102，GPU-03/05/07）──────────────
+
+GPU_INFER_DIR="$ROOT_DIR/inference/gpu-infer-service"
+
+start_gpu_infer_service() {
+  if is_port_listening 8102; then
+    echo -e "  ${CYAN}跳过${RESET} gpu-infer-service — 端口 8102 已被占用（已运行）"
+    return 0
+  fi
+  if [ ! -f "$UV_BIN" ]; then
+    echo -e "  ${RED}跳过${RESET} gpu-infer-service — uv 未找到 ($UV_BIN)"
+    return 1
+  fi
+  local log="$LOG_DIR/gpu-infer-service.log"
+  # INFER_BACKEND：onnx（默认）| tensorrt（GPU-07：TensorRT FP16，需先执行 convert_to_tensorrt.py）
+  local backend="${INFER_BACKEND:-onnx}"
+  local model_path="${ONNX_MODEL_PATH:-/models/yolov8n.onnx}"
+  local trt_path="${TRT_ENGINE_PATH:-/models/yolov8n_fp16.trt}"
+  (
+    cd "$GPU_INFER_DIR"
+    INFER_BACKEND="$backend" \
+    ONNX_MODEL_PATH="$model_path" \
+    TRT_ENGINE_PATH="$trt_path" \
+    PORT=8102 \
+    env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+    nohup "$UV_BIN" run \
+      --python 3.10 \
+      --with "fastapi==0.110.0" \
+      --with "uvicorn[standard]==0.29.0" \
+      --with "pydantic==2.6.4" \
+      --with "numpy==1.26.4" \
+      --with "opencv-python-headless==4.9.0.80" \
+      --with "onnxruntime-gpu==1.19.2" \
+      --with "structlog==24.1.0" \
+      --with "prometheus-client==0.20.0" \
+      python3 src/main.py > "$log" 2>&1 &
+    echo -e "  ${GREEN}已启动${RESET} gpu-infer-service  (PID=$!, port=8102, backend=$backend, log=$log)"
+  )
+}
+
+stop_gpu_infer_service() {
+  local pid
+  pid=$(get_pid_on_port 8102)
+  if [ -n "$pid" ]; then
+    kill "$pid" 2>/dev/null && echo -e "  ${YELLOW}停止${RESET} gpu-infer-service (PID=$pid)" || true
+  fi
+}
+
 gateway_status() {
   local state
   state=$(docker inspect -f '{{.State.Running}}' tianjing-gateway 2>/dev/null || echo "missing")
@@ -292,11 +384,26 @@ show_status() {
       ((fail++)) || true
     fi
   done
+  # 检查 Python 推理服务（不在 SERVICES 数组中）
+  for entry in "gpu-infer-service:8102" "recording-replay-service:8091" "cloud-inference-proxy:8092"; do
+    local name=${entry%%:*} port=${entry##*:}
+    local code
+    code=$(health_check "$port")
+    if [ "$code" = "200" ]; then
+      printf "  ${GREEN}✅ UP${RESET}  %-35s port=%s\n" "$name" "$port"
+      ((ok++)) || true
+    else
+      local label="${code:-NO_CONN}"
+      printf "  ${RED}❌ %-6s${RESET} %-35s port=%s\n" "$label" "$name" "$port"
+      ((fail++)) || true
+    fi
+  done
   echo ""
+  local total=$((${#SERVICES[@]} + 3))
   if [ "$fail" -eq 0 ]; then
-    echo -e "${GREEN}${BOLD}全部 $ok/18 服务正常运行${RESET}"
+    echo -e "${GREEN}${BOLD}全部 $ok/$total 服务正常运行${RESET}"
   else
-    echo -e "${YELLOW}${BOLD}$ok/18 UP，$fail 个异常${RESET}"
+    echo -e "${YELLOW}${BOLD}$ok/$total UP，$fail 个异常${RESET}"
   fi
 }
 
@@ -310,6 +417,8 @@ case "$MODE" in
     for entry in "${SERVICES[@]}"; do
       stop_service "${entry%%:*}" "${entry##*:}"
     done
+    stop_gpu_infer_service
+    stop_recording_replay_service
     stop_cloud_inference_proxy
     stop_gateway
     echo -e "${GREEN}完成${RESET}"
@@ -332,6 +441,8 @@ case "$MODE" in
     for entry in "${SERVICES[@]}"; do
       stop_service "${entry%%:*}" "${entry##*:}"
     done
+    stop_gpu_infer_service
+    stop_recording_replay_service
     stop_cloud_inference_proxy
     stop_gateway
     sleep 2
@@ -351,6 +462,8 @@ esac
 # ─── 启动网关 + 推理代理 + 所有服务 ─────────────────────────────────────────
 echo -e "\n${BOLD}▶ 启动 API 网关 + 推理代理 + 后端服务...${RESET}"
 start_gateway
+start_gpu_infer_service
+start_recording_replay_service
 start_cloud_inference_proxy
 for entry in "${SERVICES[@]}"; do
   start_service "${entry%%:*}" "${entry##*:}"
