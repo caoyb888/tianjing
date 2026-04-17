@@ -27,6 +27,9 @@ RUN pip install --no-cache-dir --timeout 120 -r requirements.txt
 # 预下载 YOLOv8n 预训练权重（构建时缓存，避免训练时联网）
 RUN python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
 
+# 预置 Ultralytics 字体（从构建上下文 COPY，避免训练时从 ultralytics.com 下载阻塞）
+COPY Arial.Unicode.ttf /home/tianjing/.config/Ultralytics/Arial.Unicode.ttf
+
 # 复制训练脚本
 COPY train_yolo_cpu.py /app/train_yolo_cpu.py
 RUN chown -R tianjing:tianjing /app

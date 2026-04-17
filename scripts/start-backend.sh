@@ -60,6 +60,9 @@ export TIANJING_TDENGINE_URL=jdbc:TAOS-RS://localhost:6041/tianjing_ts?timezone=
 export TIANJING_TDENGINE_USER=root
 export TIANJING_TDENGINE_PASSWORD=taosdata
 
+# 仿真推理代理：指向 GPU 推理服务（LOCAL-GPU-YOLO-V1，端口 8102）
+export TIANJING_INFERENCE_PROXY_URL=http://localhost:8102
+
 # MinIO（history-replay-service 使用）
 export TIANJING_MINIO_ENDPOINT=http://localhost:9000
 export TIANJING_MINIO_PUBLIC_ENDPOINT=/minio-frames

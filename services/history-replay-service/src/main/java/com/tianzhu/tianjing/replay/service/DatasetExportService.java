@@ -365,10 +365,24 @@ public class DatasetExportService {
      */
     private void upsertTrainDataset(SimulationTask task, DatasetExportRequest req,
                                     int sampleCount, int annotationCount, String minioPrefix) {
-        String datasetCode    = req.datasetCode() != null ? req.datasetCode() : "DS-SIM-" + task.getSceneId();
         String versionId      = req.datasetVersionId();
         String createdBy      = task.getCreatedBy() != null ? task.getCreatedBy() : "system";
-        String datasetMinio   = datasetCode + "/";
+
+        // 优先使用已有 dataset_version 所属的 dataset_code，避免创建多余数据集
+        String datasetCode;
+        if (req.datasetCode() != null && !req.datasetCode().isBlank()) {
+            datasetCode = req.datasetCode();
+        } else if (versionId != null) {
+            String existing = null;
+            try {
+                existing = trainJdbcTemplate.queryForObject(
+                        "SELECT dataset_code FROM dataset_version WHERE version_id = ?", String.class, versionId);
+            } catch (Exception ignored) {}
+            datasetCode = existing != null ? existing : "DS-SIM-" + task.getSceneId();
+        } else {
+            datasetCode = "DS-SIM-" + task.getSceneId();
+        }
+        String datasetMinio = datasetCode + "/";
 
         try {
             // 1. 确保 dataset 存在
@@ -386,11 +400,12 @@ public class DatasetExportService {
                         createdBy, createdBy);
                 log.info("自动创建 dataset dataset_code={}", datasetCode);
             }
-            // 2. 更新 dataset 样本统计
+            // 2. 更新 dataset 样本统计（total_samples + positive_samples）
             trainJdbcTemplate.update(
-                    "UPDATE dataset SET total_samples = total_samples + ?, updated_by = ?, updated_at = NOW() " +
-                    "WHERE dataset_code = ?",
-                    sampleCount, createdBy, datasetCode);
+                    "UPDATE dataset SET total_samples = total_samples + ?, " +
+                    "positive_samples = positive_samples + ?, " +
+                    "updated_by = ?, updated_at = NOW() WHERE dataset_code = ?",
+                    sampleCount, annotationCount, createdBy, datasetCode);
 
             // 3. upsert dataset_version
             Integer vExists = trainJdbcTemplate.queryForObject(

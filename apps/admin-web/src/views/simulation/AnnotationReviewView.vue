@@ -154,6 +154,17 @@ const currentFrameStatus = computed(() => {
 })
 
 // ============================================================================
+// 工具函数
+// ============================================================================
+
+/** 将 MinIO 绝对地址转为 Vite 代理相对路径，解决浏览器无法访问 localhost:9000 的问题 */
+function toProxyUrl(url: string | null | undefined): string {
+  if (!url) return ''
+  return url.replace(/^https?:\/\/[^/]+(?=\/tianjing-)/, '/minio-frames')
+    .replace(/^https?:\/\/localhost:\d+/, '/minio-frames')
+}
+
+// ============================================================================
 // 方法
 // ============================================================================
 
@@ -192,7 +203,7 @@ async function loadFrames() {
       page: 1,
       size: 1000 // 加载全部，前端做虚拟滚动
     })
-    frames.value = res.data.data.items
+    frames.value = res.data.data.items.map((f: any) => ({ ...f, frameUrl: toProxyUrl(f.frameUrl) }))
     if (frames.value.length > 0 && !currentFrame.value) {
       await loadFrameDetail(frames.value[0].frameId)
     }
@@ -206,7 +217,9 @@ async function loadFrameDetail(frameId: string) {
   try {
     loading.value = true
     const res = await simulationApi.getReviewFrame(taskId.value, frameId)
-    currentFrame.value = res.data.data
+    const frameData = res.data.data
+    frameData.frameUrl = toProxyUrl(frameData.frameUrl)
+    currentFrame.value = frameData
     currentFrameIndex.value = frames.value.findIndex(f => f.frameId === frameId)
 
     // 准备检测框数据

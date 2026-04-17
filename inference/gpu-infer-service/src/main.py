@@ -503,6 +503,67 @@ async def health():
     }
 
 
+@app.get("/health")
+async def health_compat():
+    """兼容 cloud-inference-proxy 格式的健康检查（供 history-replay-service InferenceClient 调用）"""
+    backend_ok = (_ort_session is not None) or (_trt_context is not None)
+    return {
+        "status": "UP" if backend_ok else "DOWN",
+        "plugin_id": "LOCAL-GPU-YOLO-V1",
+        "backend": _current_backend,
+        "onnx_model_loaded": backend_ok,
+        "onnx_model_path": ONNX_MODEL_PATH if backend_ok else None,
+    }
+
+
+class ReloadRequest(BaseModel):
+    model_path: str   # 本地文件路径，如 /tmp/tianjing-models/MV-A48890DF/best.onnx
+    model_version_id: Optional[str] = None  # 仅用于日志记录
+
+
+@app.post("/reload")
+async def reload_model(req: ReloadRequest):
+    """
+    热加载新模型（不重启服务）。
+    仅支持 ONNX 后端；TensorRT 模式需重启服务。
+    """
+    global _ort_session, _current_backend
+
+    if _current_backend == "tensorrt":
+        raise HTTPException(status_code=400,
+                            detail="TensorRT 后端不支持热加载，请重启服务并指定新 TRT_ENGINE_PATH")
+
+    if not os.path.exists(req.model_path):
+        raise HTTPException(status_code=404,
+                            detail=f"模型文件不存在: {req.model_path}")
+
+    try:
+        import onnxruntime as ort
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        sess_options = ort.SessionOptions()
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        new_session = ort.InferenceSession(req.model_path, sess_options=sess_options,
+                                           providers=providers)
+        active = new_session.get_providers()
+        with _session_lock:
+            _ort_session = new_session
+        logger.info("model_hot_reloaded",
+                    model_path=req.model_path,
+                    version_id=req.model_version_id,
+                    providers=active)
+        return {
+            "status": "reloaded",
+            "model_path": req.model_path,
+            "model_version_id": req.model_version_id,
+            "providers": active,
+        }
+    except Exception as e:
+        logger.error("model_hot_reload_failed",
+                     model_path=req.model_path,
+                     error=str(e))
+        raise HTTPException(status_code=500, detail=f"热加载失败: {e}")
+
+
 @app.get("/backend")
 async def get_backend():
     """查询当前推理后端类型（GPU-07）"""

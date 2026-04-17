@@ -11,6 +11,10 @@ import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bytedeco.ffmpeg.avformat.AVFormatContext;
+import org.bytedeco.ffmpeg.avformat.AVStream;
+import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.javacpp.IntPointer;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
@@ -18,6 +22,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -29,6 +35,10 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+
+import static org.bytedeco.ffmpeg.global.avcodec.AV_PKT_DATA_DISPLAYMATRIX;
+import static org.bytedeco.ffmpeg.global.avutil.av_display_rotation_get;
+import static org.bytedeco.ffmpeg.global.avformat.av_stream_get_side_data;
 
 /**
  * 仿真执行引擎（Phase 2）
@@ -213,6 +223,15 @@ public class SimulationExecutor {
         try (FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(videoPath.toFile())) {
             grabber.start();
 
+            // 读取视频旋转角度（手机竖拍视频常见 90/270°）
+            // 优先从 AVStream display matrix side data 读取（tkhd 矩阵），
+            // 回退到 stream metadata "rotate" tag
+            // FFmpegFrameGrabber 不自动应用旋转，需手动修正
+            int rotationDeg = readVideoRotation(grabber);
+            if (rotationDeg != 0) {
+                log.info("视频[{}] 检测到旋转 {}°，将自动修正帧方向", videoIndex, rotationDeg);
+            }
+
             double videoFpsActual = grabber.getFrameRate();
             int totalFrameCount  = grabber.getLengthInFrames();
 
@@ -237,6 +256,11 @@ public class SimulationExecutor {
 
                     BufferedImage img = converter.convert(frame);
                     if (img == null) { frameNum++; continue; }
+
+                    // 应用旋转修正（rotation 元数据记录的是拍摄时顺时针角度）
+                    if (rotationDeg != 0) {
+                        img = rotateImage(img, rotationDeg);
+                    }
 
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     ImageIO.write(img, "jpg", baos);
@@ -271,6 +295,74 @@ public class SimulationExecutor {
         }
 
         return results;
+    }
+
+    /**
+     * 读取视频流的显示旋转角度（度，顺时针为正）
+     * 优先读 AVStream display matrix side data（tkhd 矩阵），
+     * 回退到 stream metadata "rotate" tag
+     */
+    private static int readVideoRotation(FFmpegFrameGrabber grabber) {
+        try {
+            AVFormatContext fmtCtx = grabber.getFormatContext();
+            if (fmtCtx == null) return 0;
+            int vsIdx = grabber.getVideoStream();
+            if (vsIdx < 0 || vsIdx >= fmtCtx.nb_streams()) return 0;
+            AVStream stream = fmtCtx.streams(vsIdx);
+
+            // 方法一：AVStream display matrix side data（tkhd 变换矩阵）
+            // av_stream_get_side_data 返回 BytePointer，指向 36 字节的 3x3 int32 矩阵
+            BytePointer sdPtr = av_stream_get_side_data(stream, AV_PKT_DATA_DISPLAYMATRIX, (org.bytedeco.javacpp.SizeTPointer) null);
+            if (sdPtr != null && !sdPtr.isNull()) {
+                try (IntPointer matrixPtr = new IntPointer(sdPtr).capacity(9)) {
+                    // av_display_rotation_get 返回逆时针角度（正值），取反得到顺时针
+                    double rotCcw = av_display_rotation_get(matrixPtr);
+                    if (!Double.isNaN(rotCcw)) {
+                        int rotCw = (int) Math.round(-rotCcw);
+                        return ((rotCw % 360) + 360) % 360;
+                    }
+                }
+            }
+
+            // 方法二：stream metadata "rotate" tag（部分安卓设备写入）
+            String rotateMeta = grabber.getVideoMetadata("rotate");
+            if (rotateMeta != null && !rotateMeta.isBlank()) {
+                try { return ((Integer.parseInt(rotateMeta.trim()) % 360) + 360) % 360; }
+                catch (NumberFormatException ignored) {}
+            }
+        } catch (Exception e) {
+            // 读取失败不影响主流程，直接返回 0（不旋转）
+        }
+        return 0;
+    }
+
+    /**
+     * 按视频 rotation 元数据旋转图像（顺时针角度）
+     * 支持 90 / 180 / 270 度，其余角度原样返回
+     */
+    private static BufferedImage rotateImage(BufferedImage src, int degrees) {
+        int normalizedDeg = ((degrees % 360) + 360) % 360;
+        if (normalizedDeg == 0) return src;
+
+        int w = src.getWidth();
+        int h = src.getHeight();
+
+        int newW = (normalizedDeg == 90 || normalizedDeg == 270) ? h : w;
+        int newH = (normalizedDeg == 90 || normalizedDeg == 270) ? w : h;
+
+        BufferedImage dst = new BufferedImage(newW, newH, src.getType() != 0 ? src.getType() : BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2d = dst.createGraphics();
+
+        AffineTransform at = new AffineTransform();
+        switch (normalizedDeg) {
+            case 90  -> { at.translate(newW, 0);    at.rotate(Math.PI / 2);  }
+            case 180 -> { at.translate(newW, newH); at.rotate(Math.PI);      }
+            case 270 -> { at.translate(0, newH);    at.rotate(-Math.PI / 2); }
+        }
+        g2d.setTransform(at);
+        g2d.drawImage(src, 0, 0, null);
+        g2d.dispose();
+        return dst;
     }
 
     private void markFailed(SimulationTask task, String errorMsg) {
