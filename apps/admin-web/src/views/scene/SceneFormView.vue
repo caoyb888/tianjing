@@ -31,7 +31,20 @@
           </el-col>
           <el-col :md="12">
             <el-form-item label="算法插件" prop="algorithmConfig.plugin_id">
-              <el-input v-model="form.algorithmConfig.plugin_id" placeholder="如: ATOM-DETECT-YOLO-V1" />
+              <el-select
+                v-model="form.algorithmConfig.plugin_id"
+                filterable
+                placeholder="请选择算法插件"
+                class="full-width"
+                :loading="pluginsLoading"
+              >
+                <el-option
+                  v-for="plugin in pluginOptions"
+                  :key="plugin.pluginId"
+                  :label="`${plugin.pluginId}（${plugin.name}）`"
+                  :value="plugin.pluginId"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :md="12">
@@ -76,6 +89,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { sceneApi } from '@/api/scene'
+import { algorithmApi } from '@/api/algorithm'
 import { FACTORY_CONFIG, SCENE_CATEGORY_CONFIG } from '@/constants'
 
 const route = useRoute()
@@ -86,6 +100,19 @@ const saving = ref(false)
 
 const sceneId = computed(() => route.params.sceneId as string)
 const isEdit = computed(() => !!sceneId.value)
+
+const pluginOptions = ref<Array<{ pluginId: string; name: string }>>([])
+const pluginsLoading = ref(false)
+
+async function loadPlugins() {
+  pluginsLoading.value = true
+  try {
+    const res = await algorithmApi.list({ page: 1, size: 200 })
+    pluginOptions.value = res.data.data.items ?? []
+  } finally {
+    pluginsLoading.value = false
+  }
+}
 
 const form = reactive({
   name: '',
@@ -144,5 +171,8 @@ async function handleSubmit() {
   }
 }
 
-onMounted(loadScene)
+onMounted(() => {
+  loadScene()
+  loadPlugins()
+})
 </script>
