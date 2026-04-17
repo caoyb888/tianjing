@@ -103,6 +103,7 @@ const isEdit = computed(() => !!sceneId.value)
 
 const pluginOptions = ref<Array<{ pluginId: string; name: string }>>([])
 const pluginsLoading = ref(false)
+const currentVersion = ref<number | null>(null)  // 乐观锁版本号，PUT 时必须携带
 
 async function loadPlugins() {
   pluginsLoading.value = true
@@ -136,6 +137,14 @@ const rules: FormRules = {
   category: [{ required: true, message: '请选择场景类别', trigger: 'change' }],
 }
 
+// 前端枚举值 → DB 值（与后端 toDbFactory/toDbCategory 保持一致）
+const FACTORY_TO_DB: Record<string, string> = {
+  pellet: 'PELLET', sintering: 'SINTER', steel: 'STEEL', section: 'SECTION', strip: 'STRIP',
+}
+const CATEGORY_TO_DB: Record<string, string> = {
+  quality: 'QUALITY_INSPECT', equipment: 'EQUIPMENT_MONITOR', process: 'PROCESS_PARAM',
+}
+
 async function loadScene() {
   if (!isEdit.value) return
   loading.value = true
@@ -148,6 +157,7 @@ async function loadScene() {
     form.description = data.description || ''
     Object.assign(form.algorithmConfig, data.algorithmConfig)
     Object.assign(form.alarmConfig, data.alarmConfig)
+    currentVersion.value = data.version  // 保存乐观锁版本号
   } finally {
     loading.value = false
   }
@@ -159,10 +169,24 @@ async function handleSubmit() {
   saving.value = true
   try {
     if (isEdit.value) {
-      await sceneApi.update(sceneId.value, form)
+      // 映射为后端 SceneConfigRequest 期望的字段名
+      await sceneApi.update(sceneId.value, {
+        scene_name: form.name,
+        factory_code: FACTORY_TO_DB[form.factory] ?? form.factory.toUpperCase(),
+        category: CATEGORY_TO_DB[form.category] ?? form.category.toUpperCase(),
+        algo_params_json: form.algorithmConfig,
+        alarm_config_json: form.alarmConfig,
+        version: currentVersion.value,
+      })
       ElMessage.success('更新成功')
     } else {
-      await sceneApi.create(form)
+      await sceneApi.create({
+        scene_name: form.name,
+        factory_code: FACTORY_TO_DB[form.factory] ?? form.factory.toUpperCase(),
+        category: CATEGORY_TO_DB[form.category] ?? form.category.toUpperCase(),
+        algo_params_json: form.algorithmConfig,
+        alarm_config_json: form.alarmConfig,
+      })
       ElMessage.success('创建成功')
     }
     router.push('/scenes')
