@@ -70,7 +70,12 @@ _session_lock = threading.Lock()
 _ort_session  = None      # ONNX Runtime 会话
 _trt_engine   = None      # TensorRT 引擎
 _trt_context  = None      # TensorRT 执行上下文
+_trt_d_input  = None      # 预分配 GPU 输入缓冲区（避免每次 mem_alloc 开销）
+_trt_d_output = None      # 预分配 GPU 输出缓冲区
+_trt_h_output = None      # 预分配 Host 输出缓冲区（pinned memory 可进一步优化）
+_trt_stream   = None      # 持久化 CUDA Stream（避免每次 Stream() 创建开销）
 _current_backend = INFER_BACKEND  # 当前实际使用的后端
+_current_model_path = ONNX_MODEL_PATH  # 当前实际加载的模型路径（热加载后更新）
 
 # ── FastAPI 应用 ──────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -150,18 +155,40 @@ def _load_onnx_session():
 
 
 def _load_tensorrt_engine():
-    """加载 TensorRT FP16 Engine（GPU-06 转换产物）"""
+    """
+    加载 TensorRT FP16 Engine 并预分配 CUDA 缓冲区（GPU-06/07）
+    预分配策略：在加载时一次性分配 d_input/d_output/stream，
+    推理时复用，避免每次 mem_alloc + Stream() 的高开销。
+    返回 (engine, context, d_input, d_output, h_output, stream)
+    """
     try:
         import tensorrt as trt
+        import pycuda.driver as cuda
+        import pycuda.autoinit  # noqa: F401  — 初始化 CUDA 上下文（仅需一次）
+
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         runtime = trt.Runtime(TRT_LOGGER)
         with open(TRT_ENGINE_PATH, "rb") as f:
             engine = runtime.deserialize_cuda_engine(f.read())
         context = engine.create_execution_context()
+
+        # 预分配输入缓冲区（binding 0：[1,3,640,640] float32）
+        in_shape  = tuple(engine.get_binding_shape(0))   # (1, 3, 640, 640)
+        out_shape = tuple(engine.get_binding_shape(1))   # (1, 84, 8400)
+        in_size   = int(np.prod(in_shape))  * 4          # float32 = 4 bytes
+        out_size  = int(np.prod(out_shape)) * 4
+
+        d_input  = cuda.mem_alloc(in_size)
+        d_output = cuda.mem_alloc(out_size)
+        h_output = np.empty(out_shape, dtype=np.float32)
+        stream   = cuda.Stream()
+
         logger.info("tensorrt_engine_loaded",
                     engine_path=TRT_ENGINE_PATH,
-                    num_bindings=engine.num_bindings)
-        return engine, context
+                    num_bindings=engine.num_bindings,
+                    input_shape=list(in_shape),
+                    output_shape=list(out_shape))
+        return engine, context, d_input, d_output, h_output, stream
     except Exception as e:
         logger.error("tensorrt_engine_load_failed", error=str(e))
         raise
@@ -170,6 +197,7 @@ def _load_tensorrt_engine():
 def load_backend():
     """根据 INFER_BACKEND 环境变量加载对应后端（启动时调用）"""
     global _ort_session, _trt_engine, _trt_context, _current_backend
+    global _trt_d_input, _trt_d_output, _trt_h_output, _trt_stream
     backend = os.getenv("INFER_BACKEND", INFER_BACKEND)
     with _session_lock:
         if backend == "tensorrt":
@@ -179,7 +207,8 @@ def load_backend():
                 backend = "onnx"
             else:
                 try:
-                    _trt_engine, _trt_context = _load_tensorrt_engine()
+                    _trt_engine, _trt_context, _trt_d_input, _trt_d_output, _trt_h_output, _trt_stream = \
+                        _load_tensorrt_engine()
                     _current_backend = "tensorrt"
                     return
                 except Exception:
@@ -276,6 +305,14 @@ def _postprocess(raw_output: np.ndarray, orig_shape: tuple,
     x2 = np.clip((x2 - pad_x) / scale_x, 0, orig_w)
     y2 = np.clip((y2 - pad_y) / scale_y, 0, orig_h)
 
+    # 过滤退化框：clip 后 x2/y2 可能为 0.0，违反 BoundingBox(gt=0) 约束
+    valid = (x2 > 0) & (y2 > 0) & (x2 > x1) & (y2 > y1)
+    if not valid.any():
+        return []
+    x1, y1, x2, y2 = x1[valid], y1[valid], x2[valid], y2[valid]
+    confidences_f  = confidences_f[valid]
+    class_ids_f    = class_ids_f[valid]
+
     xyxy = np.stack([x1, y1, x2, y2], axis=1)
 
     # NMS（逐类别）
@@ -335,35 +372,28 @@ def _infer_onnx(blob: np.ndarray) -> np.ndarray:
 
 
 def _infer_tensorrt(blob: np.ndarray) -> np.ndarray:
-    """TensorRT FP16 推理（GPU-07）"""
+    """
+    TensorRT FP16 推理（GPU-07）
+    复用启动时预分配的 d_input/d_output/stream，消除每次 mem_alloc + Stream() 开销，
+    使 GPU 计算延迟从 ~34ms 降至目标 ≤18ms。
+    """
     import pycuda.driver as cuda
-    import pycuda.autoinit  # noqa: F401
-    global _trt_context, _trt_engine
+    global _trt_context, _trt_d_input, _trt_d_output, _trt_h_output, _trt_stream
 
     with _session_lock:
         if _trt_context is None:
             raise RuntimeError("TensorRT 上下文未初始化")
 
-        # 分配 GPU 内存
-        h_input  = np.ascontiguousarray(blob, dtype=np.float32)
-        d_input  = cuda.mem_alloc(h_input.nbytes)
-
-        # 获取输出大小（绑定索引 1 为输出）
-        out_binding = 1
-        out_shape   = tuple(_trt_engine.get_binding_shape(out_binding))
-        h_output    = np.empty(out_shape, dtype=np.float32)
-        d_output    = cuda.mem_alloc(h_output.nbytes)
-
-        stream = cuda.Stream()
-        cuda.memcpy_htod_async(d_input, h_input, stream)
+        h_input = np.ascontiguousarray(blob, dtype=np.float32)
+        cuda.memcpy_htod_async(_trt_d_input, h_input, _trt_stream)
         _trt_context.execute_async_v2(
-            bindings=[int(d_input), int(d_output)],
-            stream_handle=stream.handle,
+            bindings=[int(_trt_d_input), int(_trt_d_output)],
+            stream_handle=_trt_stream.handle,
         )
-        cuda.memcpy_dtoh_async(h_output, d_output, stream)
-        stream.synchronize()
+        cuda.memcpy_dtoh_async(_trt_h_output, _trt_d_output, _trt_stream)
+        _trt_stream.synchronize()
 
-    return h_output
+    return _trt_h_output.copy()   # copy 避免下一次推理前被覆盖
 
 
 def _get_gpu_memory_info() -> Dict[str, int]:
@@ -512,7 +542,7 @@ async def health_compat():
         "plugin_id": "LOCAL-GPU-YOLO-V1",
         "backend": _current_backend,
         "onnx_model_loaded": backend_ok,
-        "onnx_model_path": ONNX_MODEL_PATH if backend_ok else None,
+        "onnx_model_path": _current_model_path if backend_ok else None,
     }
 
 
@@ -527,7 +557,7 @@ async def reload_model(req: ReloadRequest):
     热加载新模型（不重启服务）。
     仅支持 ONNX 后端；TensorRT 模式需重启服务。
     """
-    global _ort_session, _current_backend
+    global _ort_session, _current_backend, _current_model_path
 
     if _current_backend == "tensorrt":
         raise HTTPException(status_code=400,
@@ -547,6 +577,7 @@ async def reload_model(req: ReloadRequest):
         active = new_session.get_providers()
         with _session_lock:
             _ort_session = new_session
+            _current_model_path = req.model_path
         logger.info("model_hot_reloaded",
                     model_path=req.model_path,
                     version_id=req.model_version_id,

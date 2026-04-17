@@ -40,13 +40,39 @@
     </DataTable>
 
     <!-- 创建会话对话框 -->
-    <el-dialog v-model="showCreate" title="创建实验会话" width="500px">
+    <el-dialog v-model="showCreate" title="创建实验会话" width="500px" @open="onDialogOpen">
       <el-form :model="createForm" label-width="100px">
         <el-form-item label="场景 ID" required>
-          <el-input v-model="createForm.sceneId" placeholder="如：SCENE-SINTER-005" />
+          <el-select
+            v-model="createForm.sceneId"
+            filterable
+            placeholder="请选择场景"
+            style="width: 100%"
+            :loading="scenesLoading"
+          >
+            <el-option
+              v-for="scene in sceneOptions"
+              :key="scene.sceneId"
+              :label="`${scene.sceneId}（${scene.sceneName || scene.factory}）`"
+              :value="scene.sceneId"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="算法插件 ID" required>
-          <el-input v-model="createForm.pluginId" placeholder="如：ATOM-DETECT-YOLO-V1" />
+        <el-form-item label="算法插件" required>
+          <el-select
+            v-model="createForm.pluginId"
+            filterable
+            placeholder="请选择算法插件"
+            style="width: 100%"
+            :loading="pluginsLoading"
+          >
+            <el-option
+              v-for="plugin in pluginOptions"
+              :key="plugin.pluginId"
+              :label="`${plugin.pluginId}（${plugin.name}）`"
+              :value="plugin.pluginId"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -65,6 +91,8 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import { sandboxApi } from '@/api/sandbox'
+import { sceneApi } from '@/api/scene'
+import { algorithmApi } from '@/api/algorithm'
 import { formatDateTime, formatPercent } from '@/utils/format'
 import type { SandboxSession } from '@/types'
 
@@ -77,6 +105,30 @@ const showCreate = ref(false)
 const creating = ref(false)
 
 const createForm = reactive({ sceneId: '', pluginId: '' })
+
+// 下拉选项数据
+const sceneOptions = ref<Array<{ sceneId: string; sceneName?: string; factory: string }>>([])
+const pluginOptions = ref<Array<{ pluginId: string; name: string }>>([])
+const scenesLoading = ref(false)
+const pluginsLoading = ref(false)
+
+async function onDialogOpen() {
+  createForm.sceneId = ''
+  createForm.pluginId = ''
+  scenesLoading.value = true
+  pluginsLoading.value = true
+  try {
+    const [scenesRes, pluginsRes] = await Promise.all([
+      sceneApi.list({ page: 1, size: 200 }),
+      algorithmApi.list({ page: 1, size: 200 }),
+    ])
+    sceneOptions.value = scenesRes.data.data.items ?? []
+    pluginOptions.value = pluginsRes.data.data.items ?? []
+  } finally {
+    scenesLoading.value = false
+    pluginsLoading.value = false
+  }
+}
 
 async function loadSessions() {
   loading.value = true
