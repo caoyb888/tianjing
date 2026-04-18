@@ -227,13 +227,13 @@ const creating = ref(false)
 
 const createForm = reactive({
   sceneId: '',
-  pluginId: 'CLOUD-PROXY-V1',
+  pluginId: 'LOCAL-GPU-YOLO-V1',
   frameFps: 1,
   videos: [{ url: '', name: '', label: 'MIXED', progress: 0 }] as VideoSlot[],
 })
 
 const pluginOptions = ref<{ pluginId: string; name: string }[]>([
-  { pluginId: 'CLOUD-PROXY-V1', name: 'CLOUD-PROXY-V1（云端推理代理）' }
+  { pluginId: 'LOCAL-GPU-YOLO-V1', name: 'LOCAL-GPU-YOLO-V1（本地 GPU 推理）' }
 ])
 
 // 模型状态：'loading' | 'loaded' | 'unloaded' | 'error'
@@ -302,7 +302,7 @@ async function warmupModel() {
 
 function openCreate() {
   createForm.sceneId = ''
-  createForm.pluginId = 'CLOUD-PROXY-V1'
+  createForm.pluginId = 'LOCAL-GPU-YOLO-V1'
   createForm.frameFps = 1
   createForm.videos = [{ url: '', name: '', label: 'MIXED', progress: 0 }]
   showCreate.value = true

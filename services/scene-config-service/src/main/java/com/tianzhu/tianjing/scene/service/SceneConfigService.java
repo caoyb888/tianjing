@@ -321,7 +321,13 @@ public class SceneConfigService {
 
     private void syncRedisCache(SceneConfig scene) {
         try {
-            String json = objectMapper.writeValueAsString(SceneConfigDetail.from(scene));
+            // 将 SceneConfigDetail 序列化后，追加 route-dispatch-service 需要的 "active" 布尔字段，
+            // 避免 SceneRouteConfig 只能识别 "active":true 而 SceneConfigDetail 只有 "status":"ACTIVE"
+            com.fasterxml.jackson.databind.node.ObjectNode node =
+                    (com.fasterxml.jackson.databind.node.ObjectNode)
+                            objectMapper.valueToTree(SceneConfigDetail.from(scene));
+            node.put("active", "ACTIVE".equalsIgnoreCase(scene.getStatus()));
+            String json = objectMapper.writeValueAsString(node);
             redisTemplate.opsForValue().set(REDIS_SCENE_KEY_PREFIX + scene.getSceneId(), json);
             log.debug("Redis 缓存已更新 key={}", REDIS_SCENE_KEY_PREFIX + scene.getSceneId());
         } catch (Exception e) {

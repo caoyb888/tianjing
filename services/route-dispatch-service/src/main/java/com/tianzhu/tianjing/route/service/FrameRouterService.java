@@ -87,7 +87,17 @@ public class FrameRouterService {
             SceneRouteConfig route = routeOpt.get();
 
             // 注入路由信息后转发
-            frameMsg.put("plugin_id", route.getActiveModelVersionId());
+            // 优先使用 algorithmConfig.plugin_id（如 LOCAL-GPU-YOLO-V1），
+            // 其次回退到 activeModelVersionId（向下兼容旧 Redis 数据格式）
+            String pluginId = null;
+            if (route.getAlgorithmConfig() != null && route.getAlgorithmConfig().getPlugin_id() != null
+                    && !route.getAlgorithmConfig().getPlugin_id().isBlank()) {
+                pluginId = route.getAlgorithmConfig().getPlugin_id();
+            }
+            if (pluginId == null || pluginId.isBlank()) {
+                pluginId = route.getActiveModelVersionId();
+            }
+            frameMsg.put("plugin_id", pluginId);
             if (route.getRoi() != null) {
                 ObjectNode roi = objectMapper.createObjectNode();
                 roi.put("x", route.getRoi().getX());

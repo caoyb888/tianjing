@@ -547,8 +547,54 @@ async def health_compat():
 
 
 class ReloadRequest(BaseModel):
-    model_path: str   # 本地文件路径，如 /tmp/tianjing-models/MV-A48890DF/best.onnx
+    model_path: str   # 本地文件路径（如 /tmp/tianjing-models/MV-A48890DF/best.onnx）
+                      # 或 MinIO URI（如 minio://tianjing-models-staging/PLUGIN/JOB/best.onnx）
     model_version_id: Optional[str] = None  # 仅用于日志记录
+
+
+def _resolve_local_model_path(model_path: str, version_id: Optional[str]) -> str:
+    """
+    将 model_path 解析为本地文件路径。
+    - 如果已是本地路径且文件存在，直接返回。
+    - 如果是 minio:// URI，则从 MinIO 下载到本地缓存目录后返回本地路径。
+    """
+    if not model_path.startswith("minio://"):
+        return model_path
+
+    # 解析 minio://{bucket}/{object_path}
+    remainder = model_path[len("minio://"):]
+    slash_idx = remainder.find("/")
+    if slash_idx < 0:
+        raise HTTPException(status_code=400, detail=f"MinIO URI 格式错误: {model_path}")
+    bucket      = remainder[:slash_idx]
+    object_name = remainder[slash_idx + 1:]
+
+    # 本地缓存路径：/tmp/tianjing-models/{version_id 或 object hash}/best.onnx
+    cache_key   = version_id or object_name.replace("/", "_")
+    local_dir   = f"/tmp/tianjing-models/{cache_key}"
+    local_path  = f"{local_dir}/best.onnx"
+
+    if os.path.exists(local_path):
+        logger.info("模型文件已缓存，跳过下载", local_path=local_path)
+        return local_path
+
+    os.makedirs(local_dir, exist_ok=True)
+
+    minio_endpoint   = os.getenv("MINIO_ENDPOINT",   "localhost:9000").removeprefix("http://").removeprefix("https://")
+    minio_access_key = os.getenv("MINIO_ACCESS_KEY",  "minioadmin")
+    minio_secret_key = os.getenv("MINIO_SECRET_KEY",  "minioadmin")
+    minio_secure     = os.getenv("MINIO_ENDPOINT",    "").startswith("https://")
+
+    try:
+        from minio import Minio
+        client = Minio(minio_endpoint, access_key=minio_access_key,
+                       secret_key=minio_secret_key, secure=minio_secure)
+        client.fget_object(bucket, object_name, local_path)
+        logger.info("从 MinIO 下载模型完成", bucket=bucket, object=object_name, local_path=local_path)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"从 MinIO 下载模型失败: {exc}") from exc
+
+    return local_path
 
 
 @app.post("/reload")
@@ -556,6 +602,7 @@ async def reload_model(req: ReloadRequest):
     """
     热加载新模型（不重启服务）。
     仅支持 ONNX 后端；TensorRT 模式需重启服务。
+    model_path 支持本地路径或 minio:// URI（自动下载到本地缓存后加载）。
     """
     global _ort_session, _current_backend, _current_model_path
 
@@ -563,34 +610,38 @@ async def reload_model(req: ReloadRequest):
         raise HTTPException(status_code=400,
                             detail="TensorRT 后端不支持热加载，请重启服务并指定新 TRT_ENGINE_PATH")
 
-    if not os.path.exists(req.model_path):
+    # 解析为本地路径（MinIO URI 自动下载）
+    local_path = _resolve_local_model_path(req.model_path, req.model_version_id)
+
+    if not os.path.exists(local_path):
         raise HTTPException(status_code=404,
-                            detail=f"模型文件不存在: {req.model_path}")
+                            detail=f"模型文件不存在: {local_path}")
 
     try:
         import onnxruntime as ort
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         sess_options = ort.SessionOptions()
         sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        new_session = ort.InferenceSession(req.model_path, sess_options=sess_options,
+        new_session = ort.InferenceSession(local_path, sess_options=sess_options,
                                            providers=providers)
         active = new_session.get_providers()
         with _session_lock:
             _ort_session = new_session
-            _current_model_path = req.model_path
+            _current_model_path = local_path
         logger.info("model_hot_reloaded",
-                    model_path=req.model_path,
+                    model_path=local_path,
+                    original_path=req.model_path,
                     version_id=req.model_version_id,
                     providers=active)
         return {
             "status": "reloaded",
-            "model_path": req.model_path,
+            "model_path": local_path,
             "model_version_id": req.model_version_id,
             "providers": active,
         }
     except Exception as e:
         logger.error("model_hot_reload_failed",
-                     model_path=req.model_path,
+                     model_path=local_path,
                      error=str(e))
         raise HTTPException(status_code=500, detail=f"热加载失败: {e}")
 

@@ -12,11 +12,15 @@ import com.tianzhu.tianjing.common.exception.ErrorCode;
 import com.tianzhu.tianjing.common.response.PageResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -33,6 +37,9 @@ import java.util.UUID;
 public class ModelVersionService {
 
     private final ModelVersionMapper modelVersionMapper;
+
+    @Value("${tianjing.inference.proxy-url:http://localhost:8092}")
+    private String inferenceProxyUrl;
 
     public PageResult<ModelVersion> listVersions(int page, int size, String pluginId, String status) {
         Page<ModelVersion> pageParam = new Page<>(page, size);
@@ -127,7 +134,41 @@ public class ModelVersionService {
         }
 
         modelVersionMapper.updateById(mv);
+
+        // 审核通过后通知 GPU 推理服务热加载（在事务提交后执行，失败不回滚）
+        if (request.approved()) {
+            triggerInferenceReload(mv);
+        }
+
         return mv;
+    }
+
+    /**
+     * 通知 GPU 推理服务热加载新上线模型。
+     * 失败只记录日志，不阻塞审核流程（模型已写库，管理员可手动触发重载）。
+     */
+    private void triggerInferenceReload(ModelVersion mv) {
+        if (mv.getModelPath() == null || mv.getModelPath().isBlank()) {
+            log.warn("模型版本无 model_path，跳过推理热加载 version_id={}", mv.getVersionId());
+            return;
+        }
+        try {
+            RestClient client = RestClient.create();
+            Map<String, String> body = Map.of(
+                    "model_path",       mv.getModelPath(),
+                    "model_version_id", mv.getVersionId()
+            );
+            client.post()
+                    .uri(inferenceProxyUrl + "/reload")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("推理服务热加载触发成功 version_id={} model_path={}", mv.getVersionId(), mv.getModelPath());
+        } catch (Exception e) {
+            log.warn("推理服务热加载触发失败（不影响审核结果，可手动重载）version_id={} error={}",
+                    mv.getVersionId(), e.getMessage());
+        }
     }
 
     @Transactional

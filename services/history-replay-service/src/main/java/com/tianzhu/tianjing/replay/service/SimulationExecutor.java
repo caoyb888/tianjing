@@ -93,7 +93,7 @@ public class SimulationExecutor {
         // 解析 algo_config（plugin_id, frame_fps）
         AlgoConfig algoConfig = parseAlgoConfig(task.getAlgoConfigJson());
         int frameFps  = (algoConfig != null && algoConfig.frameFps()  > 0) ? algoConfig.frameFps()  : 1;
-        String pluginId = (algoConfig != null && algoConfig.pluginId() != null) ? algoConfig.pluginId() : "CLOUD-PROXY-V1";
+        String pluginId = (algoConfig != null && algoConfig.pluginId() != null) ? algoConfig.pluginId() : "LOCAL-GPU-YOLO-V1";
 
         // 1. 标记 RUNNING，并检查推理模型是否就绪（未加载则自动预热）
         task.setStatus("RUNNING");

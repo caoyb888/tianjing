@@ -291,8 +291,8 @@ services:
       TAOS_CACHE_LAST: 2
     ulimits:
       nofile:
-        soft: 65536
-        hard: 65536
+        soft: 1048576
+        hard: 1048576
     volumes:
       - tdengine-data:/var/lib/taos
     healthcheck:
