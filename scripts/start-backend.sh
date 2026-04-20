@@ -408,6 +408,30 @@ stop_gpu_infer_service() {
   fi
 }
 
+# ─── 从 PostgreSQL 恢复 Redis 路由缓存（防 Redis 重启后路由缓存丢失导致丢帧）──────
+
+restore_scene_route_cache() {
+  echo -e "\n${BOLD}▶ 恢复活跃场景路由缓存到 Redis...${RESET}"
+  if [ ! -f "$UV_BIN" ]; then
+    echo -e "  ${YELLOW}跳过${RESET} Redis 路由缓存恢复 — uv 未找到 ($UV_BIN)"
+    return 0
+  fi
+  local restore_script="$SCRIPT_DIR/restore_redis_routes.py"
+  if [ ! -f "$restore_script" ]; then
+    echo -e "  ${YELLOW}跳过${RESET} Redis 路由缓存恢复 — 脚本不存在 ($restore_script)"
+    return 0
+  fi
+  if "$UV_BIN" run \
+      --with "psycopg2-binary" \
+      --with "redis" \
+      python3 "$restore_script"; then
+    echo -e "  ${GREEN}Redis 路由缓存恢复完成${RESET}"
+  else
+    echo -e "  ${RED}Redis 路由缓存恢复失败，请检查 PostgreSQL / Redis 连通性${RESET}"
+    echo -e "  ${YELLOW}提示：可手动执行: $UV_BIN run --with psycopg2-binary --with redis python3 $restore_script${RESET}"
+  fi
+}
+
 gateway_status() {
   local state
   state=$(docker inspect -f '{{.State.Running}}' tianjing-gateway 2>/dev/null || echo "missing")
@@ -530,3 +554,6 @@ sleep 45
 
 gateway_status || true
 show_status
+
+# ─── 恢复 Redis 路由缓存（防 Redis 重启后 volatile key 丢失导致静默丢帧）────────
+restore_scene_route_cache

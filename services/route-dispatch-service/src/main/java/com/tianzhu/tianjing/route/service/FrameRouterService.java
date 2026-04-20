@@ -98,13 +98,20 @@ public class FrameRouterService {
                 pluginId = route.getActiveModelVersionId();
             }
             frameMsg.put("plugin_id", pluginId);
-            if (route.getRoi() != null) {
-                ObjectNode roi = objectMapper.createObjectNode();
-                roi.put("x", route.getRoi().getX());
-                roi.put("y", route.getRoi().getY());
-                roi.put("w", route.getRoi().getW());
-                roi.put("h", route.getRoi().getH());
-                frameMsg.set("roi", roi);
+            // 防御性校验：仅当四个坐标字段均非 null 时才覆盖帧 ROI，
+            // 避免 Redis JSON 中包含复杂 roi_config_json（如含 regions 数组）时，
+            // Jackson 将其反序列化为 RoiConfig 对象但四个字段均为 null，
+            // 导致向帧消息注入 {"x":null,"y":null,"w":null,"h":null}，
+            // 进而引发 gpu-infer-service Pydantic 422 验证错误。
+            SceneRouteConfig.RoiConfig roi = route.getRoi();
+            if (roi != null && roi.getX() != null && roi.getY() != null
+                    && roi.getW() != null && roi.getH() != null) {
+                ObjectNode roiNode = objectMapper.createObjectNode();
+                roiNode.put("x", roi.getX());
+                roiNode.put("y", roi.getY());
+                roiNode.put("w", roi.getW());
+                roiNode.put("h", roi.getH());
+                frameMsg.set("roi", roiNode);
             }
 
             String enriched = objectMapper.writeValueAsString(frameMsg);
