@@ -1,23 +1,28 @@
 package com.tianzhu.tianjing.replay.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import com.tianzhu.tianjing.common.exception.ErrorCode;
 import com.tianzhu.tianjing.replay.domain.SimulationTask;
 import com.tianzhu.tianjing.replay.dto.SimulationCreateRequest;
 import com.tianzhu.tianjing.replay.repository.SimulationTaskMapper;
+import com.tianzhu.tianjing.replay.repository.SimulationVideoMapper;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
@@ -34,8 +39,12 @@ import static org.mockito.Mockito.*;
 class SimulationServiceTest {
 
     @Mock private SimulationTaskMapper taskMapper;
+    @Mock private SimulationVideoMapper videoMapper;
     @Mock private MinioClient minioClient;
+    @Mock private SimulationExecutor simulationExecutor;
+    @Spy  private ObjectMapper objectMapper = new ObjectMapper();
 
+    @InjectMocks
     private SimulationService simulationService;
 
     private static final String MINIO_ENDPOINT = "http://minio:9000";
@@ -43,7 +52,6 @@ class SimulationServiceTest {
 
     @BeforeEach
     void setUp() {
-        simulationService = new SimulationService(taskMapper, minioClient);
         ReflectionTestUtils.setField(simulationService, "minioEndpoint", MINIO_ENDPOINT);
         ReflectionTestUtils.setField(simulationService, "simBucket", SIM_BUCKET);
     }
@@ -94,7 +102,7 @@ class SimulationServiceTest {
     @DisplayName("createTask — 正常创建，task_id 格式 SIM-XXXXXXXX，状态为 PENDING")
     void createTask_validRequest_createsTaskWithCorrectDefaults() {
         String videoUrl = MINIO_ENDPOINT + "/" + SIM_BUCKET + "/simulation/SCENE-SINTER-005/uuid/video.mp4";
-        SimulationCreateRequest req = new SimulationCreateRequest("SCENE-SINTER-005", videoUrl);
+        SimulationCreateRequest req = new SimulationCreateRequest("SCENE-SINTER-005", videoUrl, "MIXED", null, null, null);
         when(taskMapper.insert(any(SimulationTask.class))).thenReturn(1);
 
         SimulationTask task = simulationService.createTask(req, "operator1");
@@ -112,7 +120,7 @@ class SimulationServiceTest {
     @DisplayName("createTask — URL 中无 bucket 前缀时 objectPath 降级使用原始 URL")
     void createTask_urlWithoutBucket_usesUrlAsObjectPath() {
         String videoUrl = "http://other-host:9000/some-other-bucket/some-path/file.mp4";
-        SimulationCreateRequest req = new SimulationCreateRequest("SCENE-PELLET-001", videoUrl);
+        SimulationCreateRequest req = new SimulationCreateRequest("SCENE-PELLET-001", videoUrl, null, null, null, null);
         when(taskMapper.insert(any(SimulationTask.class))).thenReturn(1);
 
         SimulationTask task = simulationService.createTask(req, "op");
@@ -135,14 +143,34 @@ class SimulationServiceTest {
     }
 
     @Test
-    @DisplayName("getTaskProgress — 视频已超 72 小时，抛出 SIMULATION_VIDEO_EXPIRED")
-    void getTaskProgress_expiredTask_throwsExpired() {
-        SimulationTask task = buildTask("COMPLETED", OffsetDateTime.now().minusHours(73));
+    @DisplayName("getTaskProgress — RUNNING 任务视频超 72 小时，抛出 SIMULATION_VIDEO_EXPIRED")
+    void getTaskProgress_runningExpiredTask_throwsExpired() {
+        SimulationTask task = buildTask("RUNNING", OffsetDateTime.now().minusHours(73));
         when(taskMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(task);
 
         assertThatExceptionOfType(BusinessException.class)
                 .isThrownBy(() -> simulationService.getTaskProgress("SIM-00000001"))
                 .satisfies(e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.SIMULATION_VIDEO_EXPIRED));
+    }
+
+    @Test
+    @DisplayName("getTaskProgress — 已完成任务超 72 小时，仍可正常查看详情（不抛出过期异常）")
+    void getTaskProgress_completedExpiredTask_returnsTask() {
+        SimulationTask task = buildTask("COMPLETED", OffsetDateTime.now().minusHours(73));
+        when(taskMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(task);
+        when(videoMapper.selectByTaskId(anyString())).thenReturn(List.of());
+
+        assertThatNoException().isThrownBy(() -> simulationService.getTaskProgress("SIM-00000001"));
+    }
+
+    @Test
+    @DisplayName("getTaskProgress — 已失败任务超 72 小时，仍可正常查看详情（不抛出过期异常）")
+    void getTaskProgress_failedExpiredTask_returnsTask() {
+        SimulationTask task = buildTask("FAILED", OffsetDateTime.now().minusHours(100));
+        when(taskMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(task);
+        when(videoMapper.selectByTaskId(anyString())).thenReturn(List.of());
+
+        assertThatNoException().isThrownBy(() -> simulationService.getTaskProgress("SIM-00000001"));
     }
 
     @Test

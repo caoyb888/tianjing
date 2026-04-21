@@ -156,7 +156,10 @@ public class SimulationService {
 
     public SimulationTask getTaskProgress(String taskId) {
         SimulationTask task = getTask(taskId);
-        if (task.getStartedAt() != null) {
+        // 72 小时视频过期检查：仅对未完成任务生效
+        // 已完成/失败的任务详情页需要保持可查看，不因临时文件过期而报错
+        boolean isTerminal = "COMPLETED".equals(task.getStatus()) || "FAILED".equals(task.getStatus());
+        if (!isTerminal && task.getStartedAt() != null) {
             long hoursElapsed = ChronoUnit.HOURS.between(task.getStartedAt(), OffsetDateTime.now());
             if (hoursElapsed >= 72) {
                 throw BusinessException.of(ErrorCode.SIMULATION_VIDEO_EXPIRED,
