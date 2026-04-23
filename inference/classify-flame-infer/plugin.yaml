@@ -1,0 +1,28 @@
+# 算法插件元信息（CLAUDE.md §6.3）
+plugin_id: "CLASSIFY-FLAME-V1"
+name: "烧结看火火焰强度分类"
+version: "1.0.0"
+type: "classification"     # detection | segmentation | classification | measurement | enhancement
+backbone: "EfficientNet-B2"
+service_port: 8104
+infer_endpoint: "http://localhost:8104/infer"
+health_endpoint: "http://localhost:8104/actuator/health"
+supported_scenes:
+  - "SCENE-SINTER-FIRE-001"   # 烧结厂·点火炉看火场景
+hardware_requirements:
+  min_gpu_vram_gb: 0          # CPU 推理，无需 GPU
+  supports_tensorrt: false
+  supports_onnx: true
+accuracy_metrics:
+  macro_f1: 1.00              # 在 1876 帧三段录像验证集上（方法三阶段二训练结果）
+  inference_ms_cpu: 45        # 实测目标 ≤50ms（EfficientNet-B2 224x224，CPU 单线程）
+labels:
+  - "正常"
+  - "过弱"
+  - "料面不均"
+notes: |
+  - EfficientNet-B2 三分类（正常/过弱/料面不均），来自方法三阶段二训练
+  - ONNX 模型来源: tianjing-models-staging/CLASSIFY-FLAME-V1/FLAME-20260423014138/best.onnx
+  - 推理前端已冻结前 6 个 features block，仅训练后 2 块 + 分类头
+  - 输出格式为 classifications 数组（非 detections），与其他检测插件有别
+  - 本地开发运行：通过 start-backend.sh 启动，需提前挂载 /models/flame_classify.onnx

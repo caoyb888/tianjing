@@ -51,7 +51,8 @@ CONSUMER_GROUP = "infer-dispatcher-prod-cg"   # CLAUDE.md §8.2：{service-name}
 
 # plugin_id → 推理服务 URL（LOCAL_GPU 插件有自己的推理地址）
 PLUGIN_ENDPOINTS = {
-    "LOCAL-GPU-YOLO-V1": os.getenv("GPU_INFER_URL", "http://localhost:8102"),
+    "LOCAL-GPU-YOLO-V1":   os.getenv("GPU_INFER_URL",   "http://localhost:8102"),
+    "CLASSIFY-FLAME-V1":   os.getenv("FLAME_INFER_URL", "http://localhost:8104"),
 }
 DEFAULT_INFER_URL = os.getenv("INFER_PROXY_URL", "http://localhost:8092")
 
@@ -164,6 +165,8 @@ def _process_frame(frame: dict) -> None:
             "plugin_id":        infer_result.get("plugin_id", plugin_id),
             "is_sandbox":       is_sandbox,   # CLAUDE.md §11.1：原样透传，不得修改
             "detections":       infer_result.get("detections", []),
+            # 分类插件（CLASSIFY-*）返回 classifications 而非 detections，均需透传
+            "classifications":  infer_result.get("classifications", []),
             "inference_time_ms": infer_result.get("inference_time_ms", 0),
             "timestamp_ms":     infer_result.get("timestamp_ms", frame["timestamp_ms"]),
             "backend":          infer_result.get("backend", "unknown"),

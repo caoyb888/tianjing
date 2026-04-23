@@ -313,6 +313,54 @@ stop_cloud_inference_proxy() {
   fi
 }
 
+# ─── classify-flame-infer（Python FastAPI，端口 8104，方法三阶段三）────────────
+
+CLASSIFY_FLAME_INFER_DIR="$ROOT_DIR/inference/classify-flame-infer"
+
+start_classify_flame_infer() {
+  if is_port_listening 8104; then
+    echo -e "  ${CYAN}跳过${RESET} classify-flame-infer — 端口 8104 已被占用（已运行）"
+    return 0
+  fi
+  if [ ! -f "$UV_BIN" ]; then
+    echo -e "  ${RED}跳过${RESET} classify-flame-infer — uv 未找到 ($UV_BIN)"
+    return 1
+  fi
+  # ONNX 模型路径：从 MinIO 预下载的位置，或运维手动挂载的 /models/flame_classify.onnx
+  local model_path="${FLAME_ONNX_MODEL_PATH:-/tmp/tianjing-models/CLASSIFY-FLAME-V1/best.onnx}"
+  if [ ! -f "$model_path" ]; then
+    echo -e "  ${YELLOW}警告${RESET} classify-flame-infer — 模型未找到 ($model_path)，服务将以 DEGRADED 状态启动"
+    echo -e "        运行 scripts/download_flame_model.sh 可从 MinIO 下载模型"
+  fi
+  local log="$LOG_DIR/classify-flame-infer.log"
+  (
+    cd "$CLASSIFY_FLAME_INFER_DIR"
+    ONNX_MODEL_PATH="$model_path" \
+    PORT=8104 \
+    env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+    nohup "$UV_BIN" run \
+      --python 3.10 \
+      --with "fastapi==0.110.0" \
+      --with "uvicorn[standard]==0.29.0" \
+      --with "pydantic==2.6.4" \
+      --with "numpy==1.26.4" \
+      --with "opencv-python-headless==4.9.0.80" \
+      --with "onnxruntime==1.17.3" \
+      --with "structlog==24.1.0" \
+      --with "prometheus-client==0.20.0" \
+      python3 src/main.py > "$log" 2>&1 &
+    echo -e "  ${GREEN}已启动${RESET} classify-flame-infer  (PID=$!, port=8104, model=$model_path, log=$log)"
+  )
+}
+
+stop_classify_flame_infer() {
+  local pid
+  pid=$(get_pid_on_port 8104)
+  if [ -n "$pid" ]; then
+    kill "$pid" 2>/dev/null && echo -e "  ${YELLOW}停止${RESET} classify-flame-infer (PID=$pid)" || true
+  fi
+}
+
 # ─── infer-dispatcher（Python FastAPI + Kafka Consumer，端口 8103，GPU-05）────
 
 INFER_DISPATCHER_DIR="$ROOT_DIR/inference/infer-dispatcher"
@@ -461,7 +509,7 @@ show_status() {
     fi
   done
   # 检查 Python 推理服务（不在 SERVICES 数组中）
-  for entry in "gpu-infer-service:8102" "infer-dispatcher:8103" "recording-replay-service:8091" "cloud-inference-proxy:8092"; do
+  for entry in "gpu-infer-service:8102" "infer-dispatcher:8103" "classify-flame-infer:8104" "recording-replay-service:8091" "cloud-inference-proxy:8092"; do
     local name=${entry%%:*} port=${entry##*:}
     local code
     code=$(health_check "$port")
@@ -475,7 +523,7 @@ show_status() {
     fi
   done
   echo ""
-  local total=$((${#SERVICES[@]} + 4))
+  local total=$((${#SERVICES[@]} + 5))
   if [ "$fail" -eq 0 ]; then
     echo -e "${GREEN}${BOLD}全部 $ok/$total 服务正常运行${RESET}"
   else
@@ -495,6 +543,7 @@ case "$MODE" in
     done
     stop_gpu_infer_service
     stop_infer_dispatcher
+    stop_classify_flame_infer
     stop_recording_replay_service
     stop_cloud_inference_proxy
     stop_gateway
@@ -520,6 +569,7 @@ case "$MODE" in
     done
     stop_gpu_infer_service
     stop_infer_dispatcher
+    stop_classify_flame_infer
     stop_recording_replay_service
     stop_cloud_inference_proxy
     stop_gateway
@@ -542,6 +592,7 @@ echo -e "\n${BOLD}▶ 启动 API 网关 + 推理代理 + 后端服务...${RESET}
 start_gateway
 start_gpu_infer_service
 start_infer_dispatcher
+start_classify_flame_infer
 start_recording_replay_service
 start_cloud_inference_proxy
 for entry in "${SERVICES[@]}"; do
