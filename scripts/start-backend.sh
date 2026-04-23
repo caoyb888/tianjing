@@ -382,6 +382,7 @@ start_infer_dispatcher() {
     MINIO_SECRET_KEY="minioadmin123" \
     TIANJING_KAFKA_BOOTSTRAP_SERVERS="localhost:9094" \
     GPU_INFER_URL="http://localhost:8102" \
+    FLAME_INFER_URL="http://localhost:8104" \
     INFER_PROXY_URL="http://localhost:8092" \
     PORT=8103 \
     env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY \
