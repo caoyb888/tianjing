@@ -85,6 +85,10 @@ models/
 *.mov
 lab-videos/
 
+# 训练数据集（通过 MinIO 管理，不提交到 Git）
+training/datasets/
+training/datasets_converted/
+
 # ============================================================
 # 日志
 # ============================================================
@@ -99,6 +103,7 @@ logs/
 ._*
 Thumbs.db
 .vscode/
+.claude/
 *.swp
 *.swo
 

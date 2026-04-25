@@ -1,4 +1,4 @@
-package com.tianzhu.tianjing.aggregate.dto;
+package com.tianzhu.tianjing.alarm.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -6,35 +6,45 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 推理结果消息 DTO
+ * 推理结果消息 DTO（alarm-judge-service 告警判定消费端）
  * 规范：CLAUDE.md §8.3 推理结果消息 Schema
  *
- * 消费 Topic：
- *   tianjing.infer.result.production（is_sandbox=false）
- *   tianjing.infer.result.sandbox  （is_sandbox=true）
+ * 同时支持：
+ *   - 检测插件（YOLO 等）：detections 列表
+ *   - 分类插件（CLASSIFY-*）：classifications 列表
  */
 @Data
 public class InferResultMessage {
+
     @JsonProperty("frame_id")
     private String frameId;
+
     @JsonProperty("scene_id")
     private String sceneId;
+
     @JsonProperty("plugin_id")
     private String pluginId;
+
     @JsonProperty("is_sandbox")
-    private boolean isSandbox;
+    private boolean sandbox;
+
     private List<Detection> detections;
+
+    /** 分类插件（CLASSIFY-*）输出；检测插件此字段为空或 null */
+    private List<Classification> classifications;
+
     @JsonProperty("inference_time_ms")
     private double inferenceTimeMs;
+
     @JsonProperty("timestamp_ms")
     private long timestampMs;
-    /** 原始帧 MinIO URL（minio://bucket/path），供大屏实时推理画面渲染 */
+
     @JsonProperty("image_url")
     private String imageUrl;
-    /** 厂部（来自场景配置，由 infer-dispatcher 透传） */
+
     private String factory;
-    /** 分类插件（CLASSIFY-*）输出；检测插件此字段为空列表 */
-    private List<Classification> classifications;
+
+    private String backend;
 
     @Data
     public static class Detection {
