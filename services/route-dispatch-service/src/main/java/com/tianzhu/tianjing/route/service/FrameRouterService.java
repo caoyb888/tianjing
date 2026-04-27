@@ -98,6 +98,12 @@ public class FrameRouterService {
                 pluginId = route.getActiveModelVersionId();
             }
             frameMsg.put("plugin_id", pluginId);
+            // 将场景配置中的 conf_threshold 注入帧消息（供 infer-dispatcher 透传至推理服务）
+            // 低代码编排器修改 inf 节点 conf_threshold 后，无需重启 GPU 推理容器即可生效
+            SceneRouteConfig.AlgorithmConfig algoCfg = route.getAlgorithmConfig();
+            if (algoCfg != null && algoCfg.getConf_threshold() != null) {
+                frameMsg.put("conf_threshold", algoCfg.getConf_threshold());
+            }
             // 防御性校验：仅当四个坐标字段均非 null 时才覆盖帧 ROI，
             // 避免 Redis JSON 中包含复杂 roi_config_json（如含 regions 数组）时，
             // Jackson 将其反序列化为 RoiConfig 对象但四个字段均为 null，

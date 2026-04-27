@@ -39,6 +39,7 @@ logger = structlog.get_logger()
 # ── 环境变量配置 ──────────────────────────────────────────────────────────────
 ONNX_MODEL_PATH = os.getenv("ONNX_MODEL_PATH", "/models/flame_classify.onnx")
 CONF_THRESHOLD  = float(os.getenv("CONF_THRESHOLD", "0.85"))
+INFER_BACKEND   = os.getenv("INFER_BACKEND", "gpu")   # gpu | cpu
 IMG_SIZE        = 224   # EfficientNet-B2 输入尺寸
 PORT            = int(os.getenv("PORT", "8104"))
 
@@ -63,25 +64,42 @@ infer_total = Counter(
 )
 
 # ── 全局 ONNX 会话（启动时加载，之后线程安全复用）────────────────────────────
-_ort_session = None
+_ort_session    = None
+_active_backend = "cpu"   # 实际加载后更新，用于健康检查上报
 
 
 def _load_model() -> None:
-    """加载 ONNX Runtime CPU 会话（仅在 startup 时调用一次）"""
-    global _ort_session
+    """
+    加载 ONNX Runtime 会话。
+    优先尝试 GPU（CUDAExecutionProvider），不可用时自动降级到 CPU。
+    通过 INFER_BACKEND=cpu 可强制使用 CPU 模式。
+    """
+    global _ort_session, _active_backend
     try:
         import onnxruntime as ort
         sess_options = ort.SessionOptions()
         sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        sess_options.intra_op_num_threads = 2   # CPU 分类无需大量线程
+
+        if INFER_BACKEND == "cpu":
+            providers = ["CPUExecutionProvider"]
+            sess_options.intra_op_num_threads = 2
+        else:
+            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
         _ort_session = ort.InferenceSession(
             ONNX_MODEL_PATH,
             sess_options=sess_options,
-            providers=["CPUExecutionProvider"],
+            providers=providers,
         )
+        active_providers = _ort_session.get_providers()
+        _active_backend = "gpu" if "CUDAExecutionProvider" in active_providers else "cpu"
+
         input_meta = _ort_session.get_inputs()[0]
         logger.info("onnx_model_loaded",
                     model_path=ONNX_MODEL_PATH,
+                    requested_backend=INFER_BACKEND,
+                    active_backend=_active_backend,
+                    providers=active_providers,
                     input_name=input_meta.name,
                     input_shape=input_meta.shape,
                     labels=LABELS)
@@ -261,12 +279,13 @@ async def infer(req: InferRequest):
 async def health():
     model_ok = _ort_session is not None
     return {
-        "status":       "UP" if model_ok else "DEGRADED",
-        "service":      "classify-flame-infer",
-        "plugin_id":    "CLASSIFY-FLAME-V1",
-        "model_loaded": model_ok,
-        "model_path":   ONNX_MODEL_PATH,
-        "labels":       LABELS,
+        "status":           "UP" if model_ok else "DEGRADED",
+        "service":          "classify-flame-infer",
+        "plugin_id":        "CLASSIFY-FLAME-V1",
+        "model_loaded":     model_ok,
+        "model_path":       ONNX_MODEL_PATH,
+        "backend":          _active_backend,
+        "labels":           LABELS,
     }
 
 
@@ -275,11 +294,11 @@ async def health_compat():
     """兼容 cloud-inference-proxy 格式（供 start-backend.sh health_check 使用）"""
     model_ok = _ort_session is not None
     return {
-        "status":          "UP" if model_ok else "DOWN",
-        "plugin_id":       "CLASSIFY-FLAME-V1",
-        "backend":         "onnx_cpu",
+        "status":            "UP" if model_ok else "DOWN",
+        "plugin_id":         "CLASSIFY-FLAME-V1",
+        "backend":           f"onnx_{_active_backend}",
         "onnx_model_loaded": model_ok,
-        "onnx_model_path": ONNX_MODEL_PATH if model_ok else None,
+        "onnx_model_path":   ONNX_MODEL_PATH if model_ok else None,
     }
 
 

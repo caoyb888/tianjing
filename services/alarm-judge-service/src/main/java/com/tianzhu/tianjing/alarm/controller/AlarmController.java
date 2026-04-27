@@ -1,7 +1,8 @@
 package com.tianzhu.tianjing.alarm.controller;
 
-import com.tianzhu.tianjing.alarm.domain.AlarmRecord;
+import com.tianzhu.tianjing.alarm.dto.AlarmDetailDTO;
 import com.tianzhu.tianjing.alarm.dto.AlarmFeedbackRequest;
+import com.tianzhu.tianjing.alarm.dto.AlarmListItemDTO;
 import com.tianzhu.tianjing.alarm.dto.AlarmQueryParams;
 import com.tianzhu.tianjing.alarm.service.AlarmService;
 import com.tianzhu.tianjing.common.response.ApiResponse;
@@ -46,7 +47,7 @@ public class AlarmController {
      * @param end_time    结束时间（可选，ISO 8601格式）
      */
     @GetMapping
-    public ApiResponse<PageResult<AlarmRecord>> listAlarms(
+    public ApiResponse<PageResult<AlarmListItemDTO>> listAlarms(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String scene_id,
@@ -78,8 +79,8 @@ public class AlarmController {
      * GET /alarms/{alarm_id} — 查询单条告警详情
      */
     @GetMapping("/{alarm_id}")
-    public ApiResponse<AlarmRecord> getAlarm(@PathVariable("alarm_id") String alarmId) {
-        return ApiResponse.ok(alarmService.getAlarm(alarmId));
+    public ApiResponse<AlarmDetailDTO> getAlarm(@PathVariable("alarm_id") String alarmId) {
+        return ApiResponse.ok(alarmService.getAlarmDetail(alarmId));
     }
 
     /**

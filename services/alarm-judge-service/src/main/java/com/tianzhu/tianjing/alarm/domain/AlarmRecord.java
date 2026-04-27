@@ -83,6 +83,10 @@ public class AlarmRecord {
     @TableField("resolved_at")
     private OffsetDateTime resolvedAt;
 
+    /** 人工处置类型：TRUE_POSITIVE / FALSE_POSITIVE / FALSE_NEGATIVE（提交反馈后写入） */
+    @TableField("feedback_status")
+    private String feedbackStatus;
+
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;
 }

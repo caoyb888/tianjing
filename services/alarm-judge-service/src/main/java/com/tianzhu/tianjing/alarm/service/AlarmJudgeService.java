@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tianzhu.tianjing.alarm.domain.AlarmRecord;
 import com.tianzhu.tianjing.alarm.dto.InferResultMessage;
 import com.tianzhu.tianjing.alarm.repository.AlarmRecordMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,8 +17,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -62,6 +66,12 @@ public class AlarmJudgeService {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
+
+    /** tianjing_alarm_total 计数器缓存，按 scene_id+level+is_sandbox 三维 */
+    private final Map<String, Counter> alarmCounters = new ConcurrentHashMap<>();
+    /** tianjing_alarm_intercepted_total 计数器缓存，按 scene_id */
+    private final Map<String, Counter> interceptedCounters = new ConcurrentHashMap<>();
 
     @Value("${tianjing.alarm.confirm-frames:3}")
     private int configCriticalFrames;
@@ -123,11 +133,17 @@ public class AlarmJudgeService {
         log.info("告警记录已创建 alarm_id={} scene_id={} level={} anomaly={} conf={} is_sandbox={}",
                 record.getAlarmId(), sceneId, actualLevel, anomalyType, conf, sandbox);
 
-        // 7. 重置连续帧计数 + 设置冷却期
+        // 7. Prometheus 指标（CLAUDE.md §14.2）
+        alarmCounter(sceneId, actualLevel, sandbox).increment();
+        if (!allowPush) {
+            interceptedCounter(sceneId).increment();
+        }
+
+        // 8. 重置连续帧计数 + 设置冷却期
         resetAnomalyCount(sceneId, anomalyType);
         redisTemplate.opsForValue().set(cooldownKey, "1", ALARM_COOLDOWN_TTL_SECONDS, TimeUnit.SECONDS);
 
-        // 8. 生产告警发布 Kafka（Sandbox 告警绝不到达此处，CLAUDE.md §15 P0）
+        // 9. 生产告警发布 Kafka（Sandbox 告警绝不到达此处，CLAUDE.md §15 P0）
         if (allowPush) {
             publishAlarmMessage(record);
         }
@@ -243,6 +259,27 @@ public class AlarmJudgeService {
         } catch (Exception e) {
             log.error("告警 Kafka 发布失败 alarm_id={}", record.getAlarmId(), e);
         }
+    }
+
+    // ── Prometheus 指标辅助 ────────────────────────────────────────────────────
+
+    private Counter alarmCounter(String sceneId, String level, boolean isSandbox) {
+        String key = sceneId + "|" + level + "|" + isSandbox;
+        return alarmCounters.computeIfAbsent(key, k ->
+                Counter.builder("tianjing_alarm_total")
+                        .description("告警触发计数")
+                        .tag("scene_id", sceneId)
+                        .tag("level", level)
+                        .tag("is_sandbox", String.valueOf(isSandbox))
+                        .register(meterRegistry));
+    }
+
+    private Counter interceptedCounter(String sceneId) {
+        return interceptedCounters.computeIfAbsent(sceneId, k ->
+                Counter.builder("tianjing_alarm_intercepted_total")
+                        .description("Sandbox 告警拦截计数")
+                        .tag("scene_id", sceneId)
+                        .register(meterRegistry));
     }
 
     // ── 内部值对象 ─────────────────────────────────────────────────────────────

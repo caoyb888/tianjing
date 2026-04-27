@@ -1,0 +1,10 @@
+apiVersion: 1
+
+providers:
+  - name: tianjing
+    folder: 天柱·天镜
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

@@ -57,6 +57,8 @@ public class SceneRouteConfig {
     public static class AlgorithmConfig {
         /** 推理插件 ID，如 LOCAL-GPU-YOLO-V1 */
         private String plugin_id;
+        /** 推理置信度阈值，透传至推理服务（低代码编排器 inf 节点 conf_threshold 参数） */
+        private Double conf_threshold;
     }
 
     @Data

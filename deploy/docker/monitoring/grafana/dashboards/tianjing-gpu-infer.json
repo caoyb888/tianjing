@@ -1,0 +1,251 @@
+{
+  "uid": "tianjing-gpu-infer-s302",
+  "title": "天柱·天镜 GPU 推理监控",
+  "tags": ["tianjing", "gpu", "inference"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "scene_id",
+        "type": "query",
+        "label": "场景",
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+        "definition": "label_values(tianjing_infer_total, scene_id)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(tianjing_infer_total, scene_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "hide": 0,
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "推理延迟 P95（目标 ≤25ms）",
+      "type": "gauge",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 8 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "max": 50,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "red", "value": 25 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(tianjing_infer_duration_seconds_bucket{scene_id=~\"$scene_id\", is_sandbox=\"false\"}[5m])) * 1000",
+          "legendFormat": "P95 延迟",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "推理延迟 P50 / P95 / P99",
+      "type": "timeseries",
+      "gridPos": { "x": 6, "y": 0, "w": 12, "h": 8 },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 25 }
+            ]
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "P95" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(tianjing_infer_duration_seconds_bucket{scene_id=~\"$scene_id\", is_sandbox=\"false\"}[2m])) * 1000",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(tianjing_infer_duration_seconds_bucket{scene_id=~\"$scene_id\", is_sandbox=\"false\"}[2m])) * 1000",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(tianjing_infer_duration_seconds_bucket{scene_id=~\"$scene_id\", is_sandbox=\"false\"}[2m])) * 1000",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "GPU 显存占用",
+      "type": "gauge",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 8 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "min": 0,
+          "max": 32768,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 20000 },
+              { "color": "red", "value": 28000 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "tianjing_gpu_memory_used_bytes{gpu_index=\"0\"} / 1024 / 1024",
+          "legendFormat": "GPU 0 显存 (MiB)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "推理帧吞吐量（帧/分钟）",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 5 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(tianjing_infer_total{scene_id=~\"$scene_id\", is_sandbox=\"false\"}[1m]) * 60",
+          "legendFormat": "帧/分钟",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "分类结果分布（烧结看火）",
+      "type": "piechart",
+      "gridPos": { "x": 6, "y": 8, "w": 8, "h": 5 },
+      "options": {
+        "pieType": "pie",
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "right" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "正常" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "过弱" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "料面不均" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "tianjing_infer_total{scene_id=~\"$scene_id\", is_sandbox=\"false\"}",
+          "legendFormat": "{{result}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "告警触发计数",
+      "type": "stat",
+      "gridPos": { "x": 14, "y": 8, "w": 5, "h": 5 },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "orientation": "vertical"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "CRITICAL" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "WARNING" },  "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "tianjing_alarm_total{scene_id=~\"$scene_id\", is_sandbox=\"false\"}",
+          "legendFormat": "{{level}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "GPU 显存趋势",
+      "type": "timeseries",
+      "gridPos": { "x": 19, "y": 8, "w": 5, "h": 5 },
+      "options": {
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "hidden" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "custom": { "lineWidth": 2, "fillOpacity": 20 }
+        }
+      },
+      "targets": [
+        {
+          "expr": "tianjing_gpu_memory_used_bytes{gpu_index=\"0\"} / 1024 / 1024",
+          "legendFormat": "GPU 0 (MiB)",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

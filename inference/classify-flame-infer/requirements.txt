@@ -3,6 +3,6 @@ uvicorn[standard]==0.29.0
 pydantic==2.6.4
 numpy==1.26.4
 opencv-python-headless==4.9.0.80
-onnxruntime==1.17.3
+onnxruntime-gpu==1.19.2
 structlog==24.1.0
 prometheus-client==0.20.0

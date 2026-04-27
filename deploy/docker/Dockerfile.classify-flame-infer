@@ -1,0 +1,43 @@
+# ============================================================
+# 天柱·天镜 烧结看火分类推理服务容器镜像
+# Plugin ID: CLASSIFY-FLAME-V1
+#
+# 基础镜像：tianjing/gpu-infer-service:1.0.0（本地已有）
+#   复用 gpu-infer-service 镜像：已包含 Python 3.10 + onnxruntime-gpu 1.19.2
+#   + CUDA 12.3 + libcublas-12-3 + libcudnn9，无需重新拉取 nvidia/cuda 基础镜像
+#   仅叠加 classify-flame-infer 服务代码层，构建快速
+#   服务端口：8104
+#
+# 构建（在项目根目录执行）：
+#   docker build -f deploy/docker/Dockerfile.classify-flame-infer \
+#     -t tianjing/classify-flame-infer:1.0.0 .
+#
+# 运行（需要 NVIDIA Docker Runtime）：
+#   docker run --gpus all --rm \
+#     -p 8104:8104 \
+#     -v /tmp/tianjing-models/CLASSIFY-FLAME-V1:/models:ro \
+#     -e ONNX_MODEL_PATH=/models/best.onnx \
+#     -e INFER_BACKEND=gpu \
+#     tianjing/classify-flame-infer:1.0.0
+# ============================================================
+
+FROM tianjing/gpu-infer-service:1.0.0
+
+# ── 切换回 root 安装新代码（基础镜像末尾是 tianjing 用户）───
+USER root
+
+WORKDIR /app
+
+# ── 覆盖服务代码（classify-flame-infer，替换原 gpu-infer-service 代码）─
+COPY inference/classify-flame-infer/src/ /app/src/
+RUN chown -R tianjing:tianjing /app/src
+
+USER tianjing
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8104/actuator/health || exit 1
+
+EXPOSE 8104
+
+ENV PORT=8104
+CMD ["python3", "src/main.py"]

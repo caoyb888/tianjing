@@ -44,8 +44,8 @@ public class AlarmSecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // 内部接口：K8s NetworkPolicy 保护，免 JWT
                 .requestMatchers("/internal/**").permitAll()
-                // Actuator 健康检查
-                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                // Actuator 健康检查 + Prometheus 指标采集（Prometheus scraper 无 JWT）
+                .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
                 // 大屏监控只读接口：monitor-screen 无登录公开展示，免认证
                 // SECURITY: 仅开放 GET 方法；接口返回只读告警列表，无敏感操作
                 .requestMatchers(HttpMethod.GET, "/api/v1/alarms").permitAll()

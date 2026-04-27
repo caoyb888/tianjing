@@ -131,7 +131,9 @@ def _call_infer(plugin_id: str, image_b64: str, frame: dict) -> dict:
         "frame_id":     frame["frame_id"],
         "timestamp_ms": frame["timestamp_ms"],
         "is_sandbox":   frame.get("is_sandbox", False),   # CLAUDE.md §11.1：原样透传
-        "conf_threshold": 0.25,
+        # 优先使用帧消息中由 route-dispatch-service 注入的场景 conf_threshold（低代码编排器动态配置）
+        # CLASSIFY-FLAME-V1 默认 0.85；YOLO 检测类插件保持 0.25 兜底
+        "conf_threshold": frame.get("conf_threshold", 0.25),
         "iou_threshold":  0.45,
     }
     if frame.get("roi"):

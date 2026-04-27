@@ -313,52 +313,108 @@ stop_cloud_inference_proxy() {
   fi
 }
 
-# ─── classify-flame-infer（Python FastAPI，端口 8104，方法三阶段三）────────────
+# ─── classify-flame-infer（Docker 容器，GPU，端口 8104）──────────────────────
+# 镜像：tianjing/classify-flame-infer:1.0.0（由 Dockerfile.classify-flame-infer 构建）
+# 复用 gpu-infer-service 基础镜像，内含 onnxruntime-gpu + CUDA 12.3 + cuDNN9
+# GPU 推理延迟 P99 ≈ 6ms（EfficientNet-B2 224×224，CUDAExecutionProvider）
 
-CLASSIFY_FLAME_INFER_DIR="$ROOT_DIR/inference/classify-flame-infer"
+CLASSIFY_FLAME_IMAGE="${CLASSIFY_FLAME_IMAGE:-tianjing/classify-flame-infer:1.0.0}"
+CLASSIFY_FLAME_CONTAINER="classify-flame-infer"
 
 start_classify_flame_infer() {
   if is_port_listening 8104; then
     echo -e "  ${CYAN}跳过${RESET} classify-flame-infer — 端口 8104 已被占用（已运行）"
     return 0
   fi
-  if [ ! -f "$UV_BIN" ]; then
-    echo -e "  ${RED}跳过${RESET} classify-flame-infer — uv 未找到 ($UV_BIN)"
-    return 1
-  fi
-  # ONNX 模型路径：从 MinIO 预下载的位置，或运维手动挂载的 /models/flame_classify.onnx
-  local model_path="${FLAME_ONNX_MODEL_PATH:-/tmp/tianjing-models/CLASSIFY-FLAME-V1/best.onnx}"
-  if [ ! -f "$model_path" ]; then
-    echo -e "  ${YELLOW}警告${RESET} classify-flame-infer — 模型未找到 ($model_path)，服务将以 DEGRADED 状态启动"
+
+  # 模型目录：整个 CLASSIFY-FLAME-V1 目录挂载为 /models（只读）
+  local model_dir="${FLAME_ONNX_MODEL_PATH:-/tmp/tianjing-models/CLASSIFY-FLAME-V1}"
+  local model_file="$model_dir/best.onnx"
+  if [ ! -f "$model_file" ]; then
+    echo -e "  ${YELLOW}警告${RESET} classify-flame-infer — 模型未找到 ($model_file)，服务将以 DEGRADED 状态启动"
     echo -e "        运行 scripts/download_flame_model.sh 可从 MinIO 下载模型"
   fi
-  local log="$LOG_DIR/classify-flame-infer.log"
-  (
-    cd "$CLASSIFY_FLAME_INFER_DIR"
-    ONNX_MODEL_PATH="$model_path" \
-    PORT=8104 \
-    env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY \
-    nohup "$UV_BIN" run \
-      --python 3.10 \
-      --with "fastapi==0.110.0" \
-      --with "uvicorn[standard]==0.29.0" \
-      --with "pydantic==2.6.4" \
-      --with "numpy==1.26.4" \
-      --with "opencv-python-headless==4.9.0.80" \
-      --with "onnxruntime==1.17.3" \
-      --with "structlog==24.1.0" \
-      --with "prometheus-client==0.20.0" \
-      python3 src/main.py > "$log" 2>&1 &
-    echo -e "  ${GREEN}已启动${RESET} classify-flame-infer  (PID=$!, port=8104, model=$model_path, log=$log)"
-  )
+
+  # 清理同名退出容器（避免 "name already in use" 报错）
+  docker rm -f "$CLASSIFY_FLAME_CONTAINER" 2>/dev/null || true
+
+  docker run -d \
+    --name "$CLASSIFY_FLAME_CONTAINER" \
+    --gpus all \
+    -p 8104:8104 \
+    -v "$model_dir":/models:ro \
+    -v "$ROOT_DIR/inference/classify-flame-infer/src":/app/src:ro \
+    -e ONNX_MODEL_PATH=/models/best.onnx \
+    -e INFER_BACKEND="${INFER_BACKEND:-gpu}" \
+    -e PORT=8104 \
+    --restart unless-stopped \
+    "$CLASSIFY_FLAME_IMAGE" > /dev/null
+
+  echo -e "  ${GREEN}已启动${RESET} classify-flame-infer  (容器=$CLASSIFY_FLAME_CONTAINER, port=8104, model=$model_file)"
 }
 
 stop_classify_flame_infer() {
-  local pid
-  pid=$(get_pid_on_port 8104)
-  if [ -n "$pid" ]; then
-    kill "$pid" 2>/dev/null && echo -e "  ${YELLOW}停止${RESET} classify-flame-infer (PID=$pid)" || true
+  if docker ps -q -f name="^${CLASSIFY_FLAME_CONTAINER}$" | grep -q .; then
+    docker stop "$CLASSIFY_FLAME_CONTAINER" > /dev/null 2>&1
+    docker rm   "$CLASSIFY_FLAME_CONTAINER" > /dev/null 2>&1
+    echo -e "  ${YELLOW}停止${RESET} classify-flame-infer (容器=$CLASSIFY_FLAME_CONTAINER)"
   fi
+}
+
+# ─── Prometheus + Grafana 监控（S3-02，端口 9090 / 3000）────────────────────
+# Prometheus 采集推理延迟、GPU 显存；Grafana 展示 P95 延迟看板
+# 均使用 --network=host，直接访问宿主机各推理服务 /metrics 端点
+
+MONITORING_DIR="$ROOT_DIR/deploy/docker/monitoring"
+
+start_monitoring() {
+  # ── Prometheus ──
+  if docker ps -q -f name="^tianjing-prometheus$" | grep -q .; then
+    echo -e "  ${CYAN}跳过${RESET} tianjing-prometheus — 容器已运行"
+  else
+    docker rm -f tianjing-prometheus 2>/dev/null || true
+    docker run -d \
+      --name tianjing-prometheus \
+      --network host \
+      -v "$MONITORING_DIR/prometheus.yml":/etc/prometheus/prometheus.yml:ro \
+      --restart unless-stopped \
+      prom/prometheus:v2.51.2 \
+      --config.file=/etc/prometheus/prometheus.yml \
+      --storage.tsdb.path=/prometheus \
+      --storage.tsdb.retention.time=7d \
+      --web.listen-address=:9090 > /dev/null
+    echo -e "  ${GREEN}已启动${RESET} tianjing-prometheus  (port=9090)"
+  fi
+
+  # ── Grafana ──
+  if docker ps -q -f name="^tianjing-grafana$" | grep -q .; then
+    echo -e "  ${CYAN}跳过${RESET} tianjing-grafana — 容器已运行"
+  else
+    docker rm -f tianjing-grafana 2>/dev/null || true
+    docker run -d \
+      --name tianjing-grafana \
+      --network host \
+      -v "$MONITORING_DIR/grafana/provisioning":/etc/grafana/provisioning:ro \
+      -v "$MONITORING_DIR/grafana/dashboards":/var/lib/grafana/dashboards:ro \
+      -e GF_SECURITY_ADMIN_PASSWORD=tianjing123 \
+      -e GF_USERS_ALLOW_SIGN_UP=false \
+      -e GF_AUTH_ANONYMOUS_ENABLED=true \
+      -e GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer \
+      -e GF_SERVER_HTTP_PORT=3000 \
+      --restart unless-stopped \
+      grafana/grafana:10.4.2 > /dev/null
+    echo -e "  ${GREEN}已启动${RESET} tianjing-grafana     (port=3000, admin/tianjing123)"
+  fi
+}
+
+stop_monitoring() {
+  for cname in tianjing-prometheus tianjing-grafana; do
+    if docker ps -q -f "name=^${cname}$" | grep -q .; then
+      docker stop "$cname" > /dev/null 2>&1
+      docker rm   "$cname" > /dev/null 2>&1
+      echo -e "  ${YELLOW}停止${RESET} $cname"
+    fi
+  done
 }
 
 # ─── infer-dispatcher（Python FastAPI + Kafka Consumer，端口 8103，GPU-05）────
@@ -548,6 +604,7 @@ case "$MODE" in
     stop_recording_replay_service
     stop_cloud_inference_proxy
     stop_gateway
+    stop_monitoring
     echo -e "${GREEN}完成${RESET}"
     exit 0
     ;;
@@ -574,6 +631,7 @@ case "$MODE" in
     stop_recording_replay_service
     stop_cloud_inference_proxy
     stop_gateway
+    stop_monitoring
     sleep 2
     MODE="start"
     ;;
@@ -588,7 +646,7 @@ case "$MODE" in
     ;;
 esac
 
-# ─── 启动网关 + 推理代理 + 所有服务 ─────────────────────────────────────────
+# ─── 启动网关 + 推理代理 + 监控 + 所有服务 ───────────────────────────────────
 echo -e "\n${BOLD}▶ 启动 API 网关 + 推理代理 + 后端服务...${RESET}"
 start_gateway
 start_gpu_infer_service
@@ -596,6 +654,7 @@ start_infer_dispatcher
 start_classify_flame_infer
 start_recording_replay_service
 start_cloud_inference_proxy
+start_monitoring
 for entry in "${SERVICES[@]}"; do
   start_service "${entry%%:*}" "${entry##*:}"
 done
