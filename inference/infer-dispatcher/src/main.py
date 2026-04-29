@@ -45,9 +45,16 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin123")
 PORT             = int(os.getenv("PORT", "8103"))
 
-DISPATCH_TOPIC = "tianjing.frame.production.dispatch"
-RESULT_TOPIC   = "tianjing.infer.result.production"
-CONSUMER_GROUP = "infer-dispatcher-prod-cg"   # CLAUDE.md §8.2：{service-name}-{env}-cg
+DISPATCH_TOPIC        = "tianjing.frame.production.dispatch"
+RESULT_TOPIC          = "tianjing.infer.result.production"
+CONSUMER_GROUP        = "infer-dispatcher-prod-cg"   # CLAUDE.md §8.2：{service-name}-{env}-cg
+
+# Sandbox 双路推理（CLAUDE.md §11.1，§8.1）
+SANDBOX_TOPIC         = "tianjing.frame.sandbox"
+SANDBOX_RESULT_TOPIC  = "tianjing.infer.result.sandbox"
+SANDBOX_CONSUMER_GROUP = "infer-dispatcher-sandbox-cg"
+# 候选模型使用更低 conf_threshold（更敏感），与生产模型形成对比
+SANDBOX_CONF_THRESHOLD = float(os.getenv("SANDBOX_CONF_THRESHOLD", "0.5"))
 
 # plugin_id → 推理服务 URL（LOCAL_GPU 插件有自己的推理地址）
 PLUGIN_ENDPOINTS = {
@@ -57,11 +64,13 @@ PLUGIN_ENDPOINTS = {
 DEFAULT_INFER_URL = os.getenv("INFER_PROXY_URL", "http://localhost:8092")
 
 # ── 全局健康状态 ──────────────────────────────────────────────────────────────
-_consumer_alive  = False
-_processed_total = 0
-_error_total     = 0
-_start_time      = time.time()
-_shutdown_event  = threading.Event()
+_consumer_alive         = False
+_sandbox_consumer_alive = False
+_processed_total        = 0
+_sandbox_processed_total = 0
+_error_total            = 0
+_start_time             = time.time()
+_shutdown_event         = threading.Event()
 
 # ── MinIO 客户端 ──────────────────────────────────────────────────────────────
 def _build_minio_client() -> Minio:
@@ -144,9 +153,14 @@ def _call_infer(plugin_id: str, image_b64: str, frame: dict) -> dict:
     return resp.json()
 
 
-def _process_frame(frame: dict) -> None:
-    """单帧完整处理：MinIO 下载 → GPU 推理 → 结果发布"""
-    global _processed_total, _error_total
+def _process_frame(frame: dict, result_topic: str = RESULT_TOPIC,
+                   conf_override: float | None = None) -> None:
+    """
+    单帧完整处理：MinIO 下载 → GPU 推理 → 结果发布
+    :param result_topic: 结果写入 Topic（生产/Sandbox 分别写入不同 Topic）
+    :param conf_override: 覆盖帧消息中的 conf_threshold（Sandbox 候选模型使用）
+    """
+    global _processed_total, _sandbox_processed_total, _error_total
     t_start    = time.perf_counter()
     scene_id   = frame.get("scene_id", "unknown")
     frame_id   = frame.get("frame_id", "unknown")
@@ -157,7 +171,9 @@ def _process_frame(frame: dict) -> None:
         # 1. 从 MinIO 下载原始帧图像并编码
         image_b64 = _download_image_b64(frame["image_url"])
 
-        # 2. 调用推理服务
+        # 2. 调用推理服务（Sandbox 候选模型使用 conf_override 覆盖 conf_threshold）
+        if conf_override is not None:
+            frame = {**frame, "conf_threshold": conf_override}
         infer_result = _call_infer(plugin_id, image_b64, frame)
 
         # 3. 构造结果消息（CLAUDE.md §8.3 推理结果消息格式）
@@ -178,10 +194,13 @@ def _process_frame(frame: dict) -> None:
         }
 
         # 4. 写入结果 Topic（key=sceneId，保证同一场景帧有序，CLAUDE.md §8.1）
-        _producer.send(RESULT_TOPIC, key=scene_id, value=result_msg)
+        _producer.send(result_topic, key=scene_id, value=result_msg)
 
         total_ms = round((time.perf_counter() - t_start) * 1000, 2)
-        _processed_total += 1
+        if is_sandbox:
+            _sandbox_processed_total += 1
+        else:
+            _processed_total += 1
 
         # 高频推理日志使用 DEBUG，避免日志洪流（CLAUDE.md §14.1）
         logger.debug("frame_dispatched",
@@ -256,6 +275,74 @@ def _consumer_loop() -> None:
 
 
 # ════════════════════════════════════════════════════════════
+# Sandbox 消费循环（S3-06 双路推理）
+# ════════════════════════════════════════════════════════════
+
+def _sandbox_consumer_loop() -> None:
+    """
+    Sandbox 帧消费循环，独立后台线程运行。
+    消费 tianjing.frame.sandbox（由 traffic-mirror-service 镜像降频至 5fps，is_sandbox=true）
+    → 使用候选模型 conf_threshold（SANDBOX_CONF_THRESHOLD=0.5 vs 生产的 0.25）
+    → 调用同一 GPU 推理服务，模拟不同阈值的候选模型效果
+    → 结果写入 tianjing.infer.result.sandbox
+
+    规范：CLAUDE.md §8.2（消费者组命名）、§11.1（is_sandbox 必须原样透传）
+    SECURITY: Sandbox 帧的 is_sandbox=true 在 traffic-mirror-service 设置，此处只能读取不能修改
+    """
+    global _sandbox_consumer_alive
+    logger.info("sandbox_consumer_starting",
+                topic=SANDBOX_TOPIC,
+                group=SANDBOX_CONSUMER_GROUP,
+                bootstrap=KAFKA_BOOTSTRAP,
+                sandbox_conf_threshold=SANDBOX_CONF_THRESHOLD)
+
+    consumer = KafkaConsumer(
+        SANDBOX_TOPIC,
+        bootstrap_servers=KAFKA_BOOTSTRAP,
+        group_id=SANDBOX_CONSUMER_GROUP,
+        auto_offset_reset="latest",
+        enable_auto_commit=True,
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        consumer_timeout_ms=1000,
+    )
+    _sandbox_consumer_alive = True
+    logger.info("sandbox_consumer_ready",
+                topic=SANDBOX_TOPIC,
+                group=SANDBOX_CONSUMER_GROUP)
+
+    try:
+        while not _shutdown_event.is_set():
+            for record in consumer:
+                if _shutdown_event.is_set():
+                    break
+                frame     = record.value
+                plugin_id = frame.get("plugin_id", "LOCAL-GPU-YOLO-V1")
+
+                # SECURITY: Sandbox 帧的 is_sandbox 必须为 true（traffic-mirror-service 保证）
+                # 若 is_sandbox=false（不应发生），记录安全告警并跳过
+                if not frame.get("is_sandbox", False):
+                    logger.error("SECURITY ALERT: sandbox topic 中发现 is_sandbox=false 帧，跳过",
+                                 frame_id=frame.get("frame_id"),
+                                 scene_id=frame.get("scene_id"))
+                    continue
+
+                if plugin_id and plugin_id not in PLUGIN_ENDPOINTS:
+                    logger.debug("sandbox_skip_unsupported_plugin",
+                                 plugin_id=plugin_id,
+                                 frame_id=frame.get("frame_id"))
+                    continue
+
+                # 使用候选模型的 conf_threshold，写入 sandbox 结果 Topic
+                _process_frame(frame,
+                               result_topic=SANDBOX_RESULT_TOPIC,
+                               conf_override=SANDBOX_CONF_THRESHOLD)
+    finally:
+        consumer.close()
+        _sandbox_consumer_alive = False
+        logger.info("sandbox_consumer_stopped")
+
+
+# ════════════════════════════════════════════════════════════
 # FastAPI 健康端点（端口 8103）
 # ════════════════════════════════════════════════════════════
 
@@ -271,16 +358,22 @@ async def health():
     """健康检查：返回消费者状态、处理计数、配置信息"""
     uptime_s = round(time.time() - _start_time)
     return {
-        "status":           "UP" if _consumer_alive else "STARTING",
-        "service":          "infer-dispatcher",
-        "consumer_alive":   _consumer_alive,
-        "processed_total":  _processed_total,
-        "error_total":      _error_total,
-        "uptime_seconds":   uptime_s,
-        "dispatch_topic":   DISPATCH_TOPIC,
-        "result_topic":     RESULT_TOPIC,
-        "consumer_group":   CONSUMER_GROUP,
-        "plugin_endpoints": PLUGIN_ENDPOINTS,
+        "status":                    "UP" if _consumer_alive else "STARTING",
+        "service":                   "infer-dispatcher",
+        "consumer_alive":            _consumer_alive,
+        "sandbox_consumer_alive":    _sandbox_consumer_alive,
+        "processed_total":           _processed_total,
+        "sandbox_processed_total":   _sandbox_processed_total,
+        "error_total":               _error_total,
+        "uptime_seconds":            uptime_s,
+        "dispatch_topic":            DISPATCH_TOPIC,
+        "result_topic":              RESULT_TOPIC,
+        "consumer_group":            CONSUMER_GROUP,
+        "sandbox_topic":             SANDBOX_TOPIC,
+        "sandbox_result_topic":      SANDBOX_RESULT_TOPIC,
+        "sandbox_consumer_group":    SANDBOX_CONSUMER_GROUP,
+        "sandbox_conf_threshold":    SANDBOX_CONF_THRESHOLD,
+        "plugin_endpoints":          PLUGIN_ENDPOINTS,
     }
 
 
@@ -291,11 +384,16 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
 
-    # 后台线程启动 Kafka 消费循环
+    # 后台线程启动 Kafka 消费循环（生产 + Sandbox 双路）
     consumer_thread = threading.Thread(
-        target=_consumer_loop, daemon=True, name="kafka-consumer"
+        target=_consumer_loop, daemon=True, name="kafka-consumer-prod"
     )
     consumer_thread.start()
+
+    sandbox_consumer_thread = threading.Thread(
+        target=_sandbox_consumer_loop, daemon=True, name="kafka-consumer-sandbox"
+    )
+    sandbox_consumer_thread.start()
 
     def _on_signal(sig, frame):
         logger.info("shutdown_signal_received", sig=sig)
