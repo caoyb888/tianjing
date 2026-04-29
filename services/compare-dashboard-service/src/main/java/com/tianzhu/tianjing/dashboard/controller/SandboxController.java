@@ -7,13 +7,16 @@ import com.tianzhu.tianjing.dashboard.domain.SandboxCompareReport;
 import com.tianzhu.tianjing.dashboard.domain.SandboxSession;
 import com.tianzhu.tianjing.dashboard.dto.SandboxPromoteRequest;
 import com.tianzhu.tianjing.dashboard.dto.SandboxStartRequest;
+import com.tianzhu.tianjing.dashboard.service.SandboxLiveStreamService;
 import com.tianzhu.tianjing.dashboard.service.SandboxService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
 
@@ -27,6 +30,7 @@ import java.util.Map;
 public class SandboxController {
 
     private final SandboxService sandboxService;
+    private final SandboxLiveStreamService sandboxLiveStreamService;
 
     @GetMapping("/sessions")
     public ApiResponse<PageResult<SandboxSession>> listSessions(
@@ -78,5 +82,29 @@ public class SandboxController {
             @AuthenticationPrincipal TianjingUserDetails user) {
         return ApiResponse.ok(sandboxService.promoteSession(sessionId,
                 request != null ? request : new SandboxPromoteRequest(null), user.getUsername()));
+    }
+
+    /**
+     * GET /sandbox/sessions/{session_id}/compare-live — 双路推理帧实时 SSE 流（S3-06）
+     *
+     * 推送 Sandbox 候选模型推理结果帧，前端 SandboxCompareViewer 使用此流
+     * 与生产推理流对比展示双路检测框。
+     *
+     * 事件名：sandbox-frame
+     * 事件数据：{scene_id, image_url, sandbox_detections, sandbox_inference_ms, is_sandbox, timestamp_ms}
+     *
+     * 规范：CLAUDE.md §11.1（Sandbox 帧永远不触发生产告警）
+     */
+    @GetMapping(value = "/sessions/{session_id}/compare-live",
+                produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter compareLive(@PathVariable("session_id") String sessionId) {
+        SandboxSession session = sandboxService.getSession(sessionId);
+        SseEmitter emitter = sandboxLiveStreamService.subscribeCompare(session.getSceneId());
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("connected")
+                    .data("{\"session_id\":\"" + sessionId + "\",\"scene_id\":\"" + session.getSceneId() + "\"}"));
+        } catch (Exception ignored) {}
+        return emitter;
     }
 }

@@ -51,6 +51,9 @@ public class DashboardSecurityConfig {
                 // 大屏监控只读接口：monitor-screen 无登录公开展示，免认证
                 // SECURITY: 仅开放 GET 方法；接口返回只读统计数据，无敏感信息
                 .requestMatchers(HttpMethod.GET, "/api/v1/dashboard/**").permitAll()
+                // compare-live SSE：EventSource 不支持自定义 header，免认证
+                // SECURITY: 仅流式推送 Sandbox 推理帧（只读，无生产数据）
+                .requestMatchers(HttpMethod.GET, "/api/v1/sandbox/sessions/*/compare-live").permitAll()
                 // 其余接口仍需认证（Sandbox 管理等写操作）
                 .anyRequest().authenticated()
             )

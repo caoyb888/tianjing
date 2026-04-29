@@ -61,8 +61,13 @@ public class SandboxService {
         session.setProdModelId(request.productionModelVersionId());
         session.setCandidateModelId(request.experimentModelVersionId());
         session.setStatus("RUNNING");
-        session.setStartAt(OffsetDateTime.now());
+        OffsetDateTime now = OffsetDateTime.now();
+        session.setStartAt(now);
         session.setCreatedBy(operator);
+        session.setCreatedAt(now);   // FieldFill.INSERT 无 MetaObjectHandler，显式赋值
+        session.setMirrorFps(5);
+        session.setTotalFrames(0);
+        session.setTotalAnomalyFrames(0);
         sessionMapper.insert(session);
         log.info("启动 Sandbox 会话 session_id={} scene_id={}", session.getSessionId(), session.getSceneId());
         return session;
