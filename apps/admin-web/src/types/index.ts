@@ -161,13 +161,16 @@ export interface ModelVersion {
 export interface SandboxSession {
   sessionId: string
   sceneId: string
-  pluginId: string
-  status: 'running' | 'completed' | 'failed'
-  startTime: string
-  endTime?: string
+  prodModelId?: string
+  candidateModelId?: string
+  mirrorFps?: number
+  status: 'RUNNING' | 'STOPPED' | 'COMPLETED' | 'FAILED'
+  startAt: string
+  endAt?: string
+  totalFrames?: number
+  totalAnomalyFrames?: number
   precision?: number
   recall?: number
-  comparedToProduction?: boolean
 }
 
 // 仿真视频（与后端 SimulationVideo 对应）
