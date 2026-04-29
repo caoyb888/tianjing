@@ -43,23 +43,20 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class AlarmJudgeService {
 
-    private static final String NORMAL_CLASS = "正常";
-
     /** CRITICAL 阈值：置信度 */
     private static final double CRITICAL_CONF  = 0.9;
     /** WARNING 阈值：置信度 */
     private static final double WARNING_CONF   = 0.8;
-    /** CRITICAL 连续帧数门槛 */
-    private static final int CRITICAL_FRAMES   = 3;
-    /** WARNING 连续帧数门槛 */
-    private static final int WARNING_FRAMES    = 2;
     /** 异常帧计数 Redis Key TTL（秒）：超时视为场景恢复正常 */
     private static final long ANOMALY_COUNT_TTL_SECONDS = 30;
-    /** 告警冷却 Redis Key TTL（秒）：同一场景同一异常类型在冷却期内不重复产生告警 */
-    private static final long ALARM_COOLDOWN_TTL_SECONDS = 60;
-
-    /** 已知的"正常"类名集合（兼容后续可能新增的正常态描述词） */
+    /** 默认告警冷却秒数（兜底值，优先读取场景 alarmConfig.suppress_seconds） */
+    private static final long DEFAULT_SUPPRESS_SECONDS = 300;
+    /** 默认 CRITICAL 连续帧数门槛（兜底值，优先读取场景 alarmConfig.confirm_frames） */
+    private static final int DEFAULT_CRITICAL_FRAMES = 3;
+    /** 已知的"正常"类名集合 */
     private static final Set<String> NORMAL_CLASS_NAMES = Set.of("正常", "normal", "ok");
+    /** 场景告警配置 Redis key 前缀 */
+    private static final String SCENE_CONFIG_KEY_PREFIX = "tianjing:scene:active:";
 
     private final AlarmRecordMapper alarmRecordMapper;
     private final SandboxInterceptor sandboxInterceptor;
@@ -73,8 +70,8 @@ public class AlarmJudgeService {
     /** tianjing_alarm_intercepted_total 计数器缓存，按 scene_id */
     private final Map<String, Counter> interceptedCounters = new ConcurrentHashMap<>();
 
-    @Value("${tianjing.alarm.confirm-frames:3}")
-    private int configCriticalFrames;
+    /** 场景告警配置（confirm_frames + suppress_seconds），从 Redis 按场景读取 */
+    private record SceneAlarmConfig(int criticalFrames, int warningFrames, long suppressSeconds) {}
 
     /**
      * 判定推理结果并在必要时产生告警记录。
@@ -103,23 +100,26 @@ public class AlarmJudgeService {
             return;
         }
 
-        // 3. 连续帧计数（Redis INCR + TTL 刷新）
+        // 3. 读取场景告警配置（confirm_frames + suppress_seconds，来自 Redis 场景配置）
+        SceneAlarmConfig alarmCfg = getSceneAlarmConfig(sceneId);
+
+        // 4. 连续帧计数（Redis INCR + TTL 刷新）
         int frameCount = incrementAnomalyCount(sceneId, anomalyType);
 
-        String level = determineLevel(conf, frameCount);
+        String level = determineLevel(conf, frameCount, alarmCfg);
         if (level == null) {
             // 帧数不足，尚未达到告警门槛
             return;
         }
 
-        // 4. 冷却期检查：同一场景同一异常类型 60s 内不重复产生告警
+        // 5. 冷却期检查：同一场景同一异常类型在 suppress_seconds 内不重复产生告警
         String cooldownKey = "alarm:cooldown:" + sceneId + ":" + anomalyType;
         if (Boolean.TRUE.equals(redisTemplate.hasKey(cooldownKey))) {
             log.debug("告警冷却中，跳过 scene_id={} anomaly_type={} level={}", sceneId, anomalyType, level);
             return;
         }
 
-        // 5. SECURITY: Sandbox 拦截器
+        // 6. SECURITY: Sandbox 拦截器
         //    - Sandbox 告警写入实验室 DB（alarm_level 前缀 SANDBOX_），禁止发 Kafka
         //    - 生产告警正常写入并发 Kafka（CLAUDE.md §11.1, §15 P0）
         boolean allowPush = sandboxInterceptor.allowExternalPush(sandbox);
@@ -139,9 +139,9 @@ public class AlarmJudgeService {
             interceptedCounter(sceneId).increment();
         }
 
-        // 8. 重置连续帧计数 + 设置冷却期
+        // 8. 重置连续帧计数 + 设置场景级冷却期
         resetAnomalyCount(sceneId, anomalyType);
-        redisTemplate.opsForValue().set(cooldownKey, "1", ALARM_COOLDOWN_TTL_SECONDS, TimeUnit.SECONDS);
+        redisTemplate.opsForValue().set(cooldownKey, "1", alarmCfg.suppressSeconds(), TimeUnit.SECONDS);
 
         // 9. 生产告警发布 Kafka（Sandbox 告警绝不到达此处，CLAUDE.md §15 P0）
         if (allowPush) {
@@ -201,10 +201,41 @@ public class AlarmJudgeService {
 
     // ── 告警级别判定 ───────────────────────────────────────────────────────────
 
-    private String determineLevel(double conf, int frameCount) {
-        if (conf >= CRITICAL_CONF && frameCount >= CRITICAL_FRAMES) return "CRITICAL";
-        if (conf >= WARNING_CONF  && frameCount >= WARNING_FRAMES)  return "WARNING";
-        return null;  // 帧数不足
+    private String determineLevel(double conf, int frameCount, SceneAlarmConfig cfg) {
+        // CRITICAL 区间（conf >= 0.9）：等待 criticalFrames，不经过 WARNING 直接升级
+        if (conf >= CRITICAL_CONF) {
+            return frameCount >= cfg.criticalFrames() ? "CRITICAL" : null;
+        }
+        // WARNING 区间（0.8 <= conf < 0.9）：等待 warningFrames
+        if (conf >= WARNING_CONF) {
+            return frameCount >= cfg.warningFrames() ? "WARNING" : null;
+        }
+        return null;
+    }
+
+    // ── 场景告警配置（Redis 按场景读取，低代码编排器改后即时生效）────────────────
+
+    private SceneAlarmConfig getSceneAlarmConfig(String sceneId) {
+        try {
+            String json = redisTemplate.opsForValue().get(SCENE_CONFIG_KEY_PREFIX + sceneId);
+            if (json == null) return defaultAlarmConfig();
+            com.fasterxml.jackson.databind.JsonNode alarmCfg =
+                    objectMapper.readTree(json).path("alarmConfig");
+            if (alarmCfg.isMissingNode()) return defaultAlarmConfig();
+            int confirmFrames  = alarmCfg.path("confirm_frames").asInt(DEFAULT_CRITICAL_FRAMES);
+            long suppressSec   = alarmCfg.path("suppress_seconds").asLong(DEFAULT_SUPPRESS_SECONDS);
+            // WARNING 比 CRITICAL 宽松一帧，最低 1
+            int warningFrames  = Math.max(1, confirmFrames - 1);
+            long effective     = suppressSec > 0 ? suppressSec : DEFAULT_SUPPRESS_SECONDS;
+            return new SceneAlarmConfig(confirmFrames, warningFrames, effective);
+        } catch (Exception e) {
+            log.debug("读取场景告警配置失败，使用默认值 scene_id={}", sceneId, e);
+            return defaultAlarmConfig();
+        }
+    }
+
+    private SceneAlarmConfig defaultAlarmConfig() {
+        return new SceneAlarmConfig(DEFAULT_CRITICAL_FRAMES, DEFAULT_CRITICAL_FRAMES - 1, DEFAULT_SUPPRESS_SECONDS);
     }
 
     // ── 构建告警记录 ───────────────────────────────────────────────────────────
@@ -218,7 +249,7 @@ public class AlarmJudgeService {
         r.setAlarmLevel(level);
         r.setAnomalyType(anomalyType);
         r.setConfidence(conf);
-        r.setImageUrl(result.getImageUrl());
+        r.setImageUrl(StringUtils.hasText(result.getImageUrl()) ? result.getImageUrl() : "");
         r.setFrameId(result.getFrameId());
         r.setPluginId(result.getPluginId());
         // model_version_id 为 NOT NULL；推理结果消息中无版本信息，用 plugin_id 占位
