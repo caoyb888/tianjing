@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.tianzhu.tianjing.algomodel.domain.ModelVersion;
 import com.tianzhu.tianjing.algomodel.dto.ModelApproveRequest;
 import com.tianzhu.tianjing.algomodel.dto.ModelRegisterRequest;
+import com.tianzhu.tianjing.common.exception.ErrorCode;
 import com.tianzhu.tianjing.algomodel.repository.ModelVersionMapper;
 import com.tianzhu.tianjing.common.exception.BusinessException;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -16,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -94,25 +96,68 @@ class ModelVersionServiceTest {
     // ── 状态机：合法流转 ──────────────────────────────────────
 
     @Test
-    @DisplayName("submitReview：STAGING → REVIEWING 流转成功")
+    @DisplayName("submitReview：STAGING → REVIEWING 流转成功（不检查 sandbox_hours）")
     void submitReview_fromStaging_toReviewing() {
+        ReflectionTestUtils.setField(modelVersionService, "minSandboxHours", 48);
         when(modelVersionMapper.selectOne(any())).thenReturn(stagingVersion);
 
         ModelVersion result = modelVersionService.submitReview("MV-STAGING-001", "alice");
 
         assertThat(result.getStatus()).isEqualTo("REVIEWING");
-        verify(modelVersionMapper).updateById(stagingVersion);
+        verify(modelVersionMapper).updateById((ModelVersion) stagingVersion);
     }
 
     @Test
-    @DisplayName("submitReview：SANDBOX_VALIDATING → REVIEWING 流转成功")
+    @DisplayName("submitReview：SANDBOX_VALIDATING → REVIEWING 流转成功（min-hours=0，门禁关闭）")
     void submitReview_fromSandboxValidating_toReviewing() {
+        // 默认 @InjectMocks 注入的 minSandboxHours=0（Sprint 3 测试模式）
+        ReflectionTestUtils.setField(modelVersionService, "minSandboxHours", 0);
+        sandboxValidatingVersion.setSandboxHours(0);
         when(modelVersionMapper.selectOne(any())).thenReturn(sandboxValidatingVersion);
 
         ModelVersion result = modelVersionService.submitReview("MV-SBX-001", "alice");
 
         assertThat(result.getStatus()).isEqualTo("REVIEWING");
-        verify(modelVersionMapper).updateById(sandboxValidatingVersion);
+        verify(modelVersionMapper).updateById((ModelVersion) sandboxValidatingVersion);
+    }
+
+    @Test
+    @DisplayName("submitReview：SANDBOX_VALIDATING 时 sandbox_hours 不足 → SANDBOX_HOURS_INSUFFICIENT")
+    void submitReview_fromSandboxValidating_hoursInsufficient_throws() {
+        ReflectionTestUtils.setField(modelVersionService, "minSandboxHours", 48);
+        sandboxValidatingVersion.setSandboxHours(10); // 仅 10h，未达到 48h
+        when(modelVersionMapper.selectOne(any())).thenReturn(sandboxValidatingVersion);
+
+        assertThatThrownBy(() -> modelVersionService.submitReview("MV-SBX-001", "alice"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
+                        .isEqualTo(ErrorCode.SANDBOX_HOURS_INSUFFICIENT));
+        verify(modelVersionMapper, never()).updateById(any(ModelVersion.class));
+    }
+
+    @Test
+    @DisplayName("submitReview：SANDBOX_VALIDATING sandbox_hours 达到 min-hours 阈值 → 通过")
+    void submitReview_fromSandboxValidating_hoursMetThreshold_succeeds() {
+        ReflectionTestUtils.setField(modelVersionService, "minSandboxHours", 48);
+        sandboxValidatingVersion.setSandboxHours(48);
+        when(modelVersionMapper.selectOne(any())).thenReturn(sandboxValidatingVersion);
+
+        ModelVersion result = modelVersionService.submitReview("MV-SBX-001", "alice");
+
+        assertThat(result.getStatus()).isEqualTo("REVIEWING");
+        verify(modelVersionMapper).updateById((ModelVersion) sandboxValidatingVersion);
+    }
+
+    @Test
+    @DisplayName("submitReview：STAGING 状态不受 sandbox_hours 门禁约束，直接流转 REVIEWING")
+    void submitReview_fromStaging_ignoreSandboxHoursGate() {
+        ReflectionTestUtils.setField(modelVersionService, "minSandboxHours", 48);
+        stagingVersion.setSandboxHours(0); // sandbox_hours=0，但 STAGING 不检查
+        when(modelVersionMapper.selectOne(any())).thenReturn(stagingVersion);
+
+        ModelVersion result = modelVersionService.submitReview("MV-STAGING-001", "alice");
+
+        assertThat(result.getStatus()).isEqualTo("REVIEWING");
     }
 
     // ── 状态机：非法跳步 ──────────────────────────────────────
@@ -187,7 +232,7 @@ class ModelVersionServiceTest {
 
         // 验证对旧 PRODUCTION 版本执行了 DEPRECATED 更新（LambdaUpdateWrapper）
         verify(modelVersionMapper).update(any());
-        verify(modelVersionMapper).updateById(reviewingVersion);
+        verify(modelVersionMapper).updateById((ModelVersion) reviewingVersion);
     }
 
     // ── deprecate ────────────────────────────────────────────
@@ -200,7 +245,7 @@ class ModelVersionServiceTest {
         modelVersionService.deprecate("MV-PROD-001", "admin");
 
         assertThat(productionVersion.getStatus()).isEqualTo("DEPRECATED");
-        verify(modelVersionMapper).updateById(productionVersion);
+        verify(modelVersionMapper).updateById((ModelVersion) productionVersion);
     }
 
     // ── 非法操作：非 REVIEWING 状态审核 ─────────────────────

@@ -63,6 +63,10 @@ export TIANJING_TDENGINE_PASSWORD=taosdata
 # 仿真推理代理：指向 GPU 推理服务（LOCAL-GPU-YOLO-V1，端口 8102）
 export TIANJING_INFERENCE_PROXY_URL=http://localhost:8102
 
+# Sprint 3 测试模式：Sandbox 最低验证时长门禁设为 0（绕过 48h 限制）
+# 生产上线前须移除此行或改为 48
+export TIANJING_SANDBOX_MIN_HOURS=0
+
 # MinIO（history-replay-service 使用）
 export TIANJING_MINIO_ENDPOINT=http://localhost:9000
 export TIANJING_MINIO_PUBLIC_ENDPOINT=/minio-frames

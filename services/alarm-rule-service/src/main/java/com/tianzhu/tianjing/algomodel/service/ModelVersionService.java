@@ -41,6 +41,10 @@ public class ModelVersionService {
     @Value("${tianjing.inference.proxy-url:http://localhost:8092}")
     private String inferenceProxyUrl;
 
+    /** Sandbox 最低验证时长（小时）。0 = 关闭门禁（Sprint 3 测试模式）。生产默认 48。 */
+    @Value("${tianjing.sandbox.min-hours:48}")
+    private int minSandboxHours;
+
     public PageResult<ModelVersion> listVersions(int page, int size, String pluginId, String status) {
         Page<ModelVersion> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<ModelVersion> wrapper = new LambdaQueryWrapper<ModelVersion>()
@@ -81,6 +85,9 @@ public class ModelVersionService {
 
     /**
      * 提交审核（STAGING / SANDBOX_VALIDATING → REVIEWING）
+     *
+     * 门禁：SANDBOX_VALIDATING 状态须满足最低 Sandbox 验证时长（tianjing.sandbox.min-hours，默认 48h）。
+     * Sprint 3 测试绕过：将 TIANJING_SANDBOX_MIN_HOURS=0 注入环境，min-hours 降为 0，门禁关闭。
      */
     @Transactional
     public ModelVersion submitReview(String modelVersionId, String operator) {
@@ -90,9 +97,18 @@ public class ModelVersionService {
             throw BusinessException.of(ErrorCode.RESOURCE_STATE_FORBIDDEN,
                     "当前状态 " + mv.getStatus() + " 不允许提交审核");
         }
+        // SANDBOX_VALIDATING 状态需满足最低验证时长门禁
+        if ("SANDBOX_VALIDATING".equals(mv.getStatus()) && minSandboxHours > 0) {
+            int hours = mv.getSandboxHours() != null ? mv.getSandboxHours() : 0;
+            if (hours < minSandboxHours) {
+                throw BusinessException.of(ErrorCode.SANDBOX_HOURS_INSUFFICIENT,
+                        "当前 Sandbox 验证时长 " + hours + "h 未达到最低要求 " + minSandboxHours + "h");
+            }
+        }
         mv.setStatus("REVIEWING");
         mv.setSubmittedBy(operator);
         modelVersionMapper.updateById(mv);
+        log.info("提交模型版本审核 version_id={} operator={}", modelVersionId, operator);
         return mv;
     }
 
@@ -119,11 +135,12 @@ public class ModelVersionService {
         mv.setUpdatedBy(reviewer);
 
         if (request.approved()) {
-            // 蓝绿切换：将旧生产版本标记为 DEPRECATED
+            // 蓝绿切换：将旧生产版本标记为 DEPRECATED，同步写入废弃时间戳
             modelVersionMapper.update(new LambdaUpdateWrapper<ModelVersion>()
                     .eq(ModelVersion::getPluginId, mv.getPluginId())
                     .eq(ModelVersion::getStatus, "PRODUCTION")
-                    .set(ModelVersion::getStatus, "DEPRECATED"));
+                    .set(ModelVersion::getStatus, "DEPRECATED")
+                    .set(ModelVersion::getDeprecatedAt, OffsetDateTime.now()));
 
             mv.setStatus("PRODUCTION");
             mv.setDeployedAt(OffsetDateTime.now());

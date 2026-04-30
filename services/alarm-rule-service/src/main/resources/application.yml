@@ -30,6 +30,9 @@ tianjing:
     public-key-pem: ${TIANJING_JWT_PUBLIC_KEY_PEM:}
   inference:
     proxy-url: ${TIANJING_INFERENCE_PROXY_URL:http://localhost:8092}
+  sandbox:
+    # Sandbox 最低验证时长（小时）。生产值 48；Sprint3 测试时注入 TIANJING_SANDBOX_MIN_HOURS=0 绕过门禁。
+    min-hours: ${TIANJING_SANDBOX_MIN_HOURS:48}
 
 management:
   endpoints:
